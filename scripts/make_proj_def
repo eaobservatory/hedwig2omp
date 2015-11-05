@@ -44,6 +44,7 @@ from docopt import docopt
 from hedwig.config import get_database, get_facilities
 from hedwig.type import ProposalState
 
+from hedwig2omp.config import get_config
 from hedwig2omp.type import Project
 from hedwig2omp.project_ini import write_project_ini
 
@@ -59,6 +60,14 @@ def main():
                                else (logging.WARNING if args['--quiet']
                                      else logging.INFO)))
     logger = logging.getLogger('make_proj_def')
+
+    logger.debug('Reading configuration')
+    config = get_config()
+
+    if config.has_option('queue_country', queue_code):
+        country = config.get('queue_country', queue_code)
+    else:
+        country = queue_code
 
     logger.debug('Connecting to Hedwig database')
     db = get_database()
@@ -78,7 +87,7 @@ def main():
 
         proposals.append(Project(
             code=code,
-            country=queue_code,
+            country=country,
             pi='',
             cois=[],
             title=proposal.title,
