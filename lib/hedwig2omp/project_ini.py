@@ -18,6 +18,7 @@
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
+import re
 from ConfigParser import SafeConfigParser
 
 
@@ -46,7 +47,7 @@ def write_project_ini(file_, telescope, semester, projects):
         config.set(code, 'country', project.country)
         config.set(code, 'pi', project.pi)
         config.set(code, 'coi', ','.join(project.cois))
-        config.set(code, 'title', project.title)
+        config.set(code, 'title', re.sub('[^ -~]', '?', project.title))
         config.set(code, 'band', ','.join(str(x) for x in project.bands))
         config.set(code, 'allocation', str(project.allocation))
         config.set(code, 'tagpriority', str(project.tagpriority))
