@@ -42,6 +42,7 @@ import sys
 from docopt import docopt
 
 from hedwig.config import get_database, get_facilities
+from hedwig.util import get_logger
 from hedwig.type import ProposalState
 
 from hedwig2omp.config import get_config
@@ -59,7 +60,7 @@ def main():
     logging.basicConfig(level=(logging.DEBUG if args['--verbose']
                                else (logging.WARNING if args['--quiet']
                                      else logging.INFO)))
-    logger = logging.getLogger('make_proj_def')
+    logger = get_logger('make_proj_def')
 
     logger.debug('Reading configuration')
     config = get_config()
@@ -77,13 +78,28 @@ def main():
 
     logger.debug('Finding accepted proposals for this call')
     proposals = []
+    n_err = 0
     for proposal in db.search_proposal(
             facility_id=facility_id,
             semester_code=semester_code,
             queue_code=queue_code,
             state=ProposalState.ACCEPTED,
-            with_members=True).values():
+            with_members=True,
+            with_reviewers=True, with_review_info=True).values():
         code = facility.make_proposal_code(db, proposal)
+
+        # Fetch allocation.
+        allocation = db.search_jcmt_allocation(proposal_id=proposal.id)
+        if not allocation:
+            logger.error('No allocation for project {}', code)
+            n_err += 1
+        allocation = allocation.get_total()
+        bands = [x for x in range(1, 6) if allocation.weather.get(x, False)]
+
+        # Compute priority, using formula suggested by IMC:
+        #     OMP priority = 300 - 4 * (TAC_rating - 50)
+        rating = facility.calculate_overall_rating(proposal.reviewers)
+        priority = int(500.0 - (4.0 * rating))
 
         proposals.append(Project(
             code=code,
@@ -91,10 +107,14 @@ def main():
             pi='',
             cois=[],
             title=proposal.title,
-            bands=[],
-            allocation=0.0,
-            tagpriority=0.0,
+            bands=bands,
+            allocation=allocation.total,
+            tagpriority=priority,
             support=''))
+
+    if n_err:
+        logger.info('Aborting due to {} error(s)', n_err)
+        sys.exit(1)
 
     logger.debug('Writing project definition file')
     write_args = (telescope, semester_code, proposals)
