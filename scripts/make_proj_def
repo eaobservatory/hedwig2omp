@@ -48,6 +48,7 @@ from hedwig.type import ProposalState
 from hedwig2omp.config import get_config
 from hedwig2omp.type import Project
 from hedwig2omp.project_ini import write_project_ini
+from hedwig2omp.user import UserDB
 
 
 def main():
@@ -70,6 +71,9 @@ def main():
     else:
         country = queue_code
 
+    logger.debug('Reading user lookup table')
+    users = UserDB().get_all_users()
+
     logger.debug('Connecting to Hedwig database')
     db = get_database()
     (facility_class,) = get_facilities(facility_spec=telescope)
@@ -88,6 +92,24 @@ def main():
             with_reviewers=True, with_review_info=True).values():
         code = facility.make_proposal_code(db, proposal)
 
+        # Process member list.
+        pi = None
+        cois = []
+        for member in proposal.members.values():
+            omp_id = users.get(member.person_id)
+            if omp_id is None:
+                logger.error('Unknown Hedwig user {} ({})',
+                             member.person_id, member.person_name)
+                n_err += 1
+                continue
+            if member.pi and (pi is None):
+                pi = omp_id
+            else:
+                cois.append(omp_id)
+        if pi is None:
+            logger.error('No PI for project {}', code)
+            n_err += 1
+
         # Fetch allocation.
         allocation = db.search_jcmt_allocation(proposal_id=proposal.id)
         if not allocation:
@@ -104,8 +126,8 @@ def main():
         proposals.append(Project(
             code=code,
             country=country,
-            pi='',
-            cois=[],
+            pi=pi,
+            cois=cois,
             title=proposal.title,
             bands=bands,
             allocation=allocation.total,
