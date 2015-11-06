@@ -68,7 +68,8 @@ def main():
     users = user_db.get_all_users()
 
     logger.debug('Reading users from the OMP')
-    omp_user = OMPDB().get_users_by_email()
+    omp_user = {k.lower(): v
+                for (k, v) in OMPDB().get_users_by_email().items()}
 
     logger.debug('Connecting to Hedwig database')
     db = get_database()
@@ -108,7 +109,7 @@ def main():
             for email in db.search_email(person_id=person_id).values():
                 address = email.address
                 addresses.append(address)
-                omp_id = omp_user.get(address)
+                omp_id = omp_user.get(address.lower())
                 if omp_id is None:
                     continue
 
