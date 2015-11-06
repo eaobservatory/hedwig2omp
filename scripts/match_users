@@ -21,12 +21,13 @@
 match_users - Attempt to match Hedwig users to OMP accounts
 
 Usage:
-    match_users [-v | -q] --semester <semester> --queue <queue> [--skip-unregistered]
+    match_users [-v | -q] --semester <semester> --queue <queue> [--state <state>] [--skip-unregistered]
 
 Options:
 
     --semester <semester>    Semester code
     --queue <queue>          Queue code
+    --state <state>          Select proposals of given state [default: accepted]
     --skip-unregistered, -r  Skip unregistered proposal members
     --verbose, -v            Increase verbosity
     --quiet, -q              Decreate verbosity
@@ -75,13 +76,18 @@ def main():
     facility_id = db.ensure_facility(facility_class.get_code())
     facility = facility_class(facility_id)
 
-    logger.debug('Finding accepted proposals for this call')
+    state = ProposalState.by_name(args['--state'])
+    if state is None:
+        logger.error('State "{}" not recognised', args['--state'])
+        sys.exit(1)
+
+    logger.debug('Finding proposals for this call')
     considered = set()
     for proposal in db.search_proposal(
             facility_id=facility_id,
             semester_code=semester_code,
             queue_code=queue_code,
-            state=ProposalState.ACCEPTED,
+            state=state,
             with_members=True).values():
         for member in proposal.members.values():
             if args['--skip-unregistered'] and not member.person_registered:
