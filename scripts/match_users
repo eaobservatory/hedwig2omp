@@ -119,7 +119,8 @@ def main():
 
                 response = raw_input(
                     'Store OMP ID {} for {} [y/N]: '.format(
-                        omp_id, ascii_encode(member.person_name, 'replace')[0]))
+                        omp_id,
+                        ascii_encode(member.person_name, 'replace')[0]))
                 if response.upper().startswith('Y'):
                     user_db.add_user(person_id, omp_id)
                     break
