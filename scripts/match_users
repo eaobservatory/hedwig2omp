@@ -105,6 +105,7 @@ def main():
                              users[person_id])
                 continue
 
+            # Look for direct email matches between this person and the OMP.
             addresses = []
             for email in db.search_email(person_id=person_id).values():
                 address = email.address
@@ -124,16 +125,41 @@ def main():
                     break
 
             else:
-                logger.info('No match found for: {} ({}: {})',
-                            person_id, member.person_name,
-                            ', '.join(addresses))
+                # Attempt to cross-reference with other Hedwig users by email.
+                for email in db.search_email(person_id=None,
+                                             address=addresses).values():
+                    if email.person_id == person_id:
+                        continue
 
-                omp_id = raw_input(
-                    'OMP ID for {}: '.format(ascii_encode(member.person_name, 'replace')[0]))
-                if omp_id:
-                    user_db.add_user(person_id, omp_id.upper())
+                    omp_id = users.get(email.person_id)
+                    if omp_id is None:
+                        continue
+
+                    logger.info('Found possible cross-reference: '
+                                '{} = {} ({} = {}, {})',
+                                person_id, email.person_id,
+                                member.person_name, omp_id, address)
+
+                    response = raw_input(
+                        'Store OMP ID {} for {} [y/N]: '.format(
+                            omp_id,
+                            ascii_encode(member.person_name, 'replace')[0]))
+                    if response.upper().startswith('Y'):
+                        user_db.add_user(person_id, omp_id)
+                        break
+
                 else:
-                    logger.info('No OMP ID entered, skipping...')
+                    logger.info('No match found for: {} ({}: {})',
+                                person_id, member.person_name,
+                                ', '.join(addresses))
+
+                    omp_id = raw_input(
+                        'OMP ID for {}: '.format(
+                            ascii_encode(member.person_name, 'replace')[0]))
+                    if omp_id:
+                        user_db.add_user(person_id, omp_id.upper())
+                    else:
+                        logger.info('No OMP ID entered, skipping...')
 
 
 if __name__ == '__main__':
