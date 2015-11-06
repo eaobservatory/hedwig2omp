@@ -41,3 +41,10 @@ class UserDB(object):
                 result[row[0]] = row[1]
 
         return result
+
+    def add_user(self, hedwig_id, omp_id):
+        with closing(self.db.cursor()) as c:
+            c.execute('INSERT INTO user (hedwig_id, omp_id) VALUES (?, ?)',
+                      (hedwig_id, omp_id))
+
+        self.db.commit()
