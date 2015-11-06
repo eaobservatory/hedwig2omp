@@ -38,6 +38,9 @@ class OMPDB(object):
                 if row is None:
                     break
 
+                if row[0] is None:
+                    continue
+
                 result[row[0]] = row[1]
 
         return result
