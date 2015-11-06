@@ -104,8 +104,13 @@ def main():
 
                 logger.info('Found match by email address: {} ({} = {}, {})',
                             person_id, member.person_name, omp_id, address)
-                user_db.add_user(person_id, omp_id)
-                break
+
+                response = raw_input(
+                    'Store OMP ID {} for {} [y/N]: '.format(
+                        omp_id, member.person_name))
+                if response.upper().startswith('Y'):
+                    user_db.add_user(person_id, omp_id)
+                    break
 
             else:
                 logger.info('No match found for: {} ({}: {})',
