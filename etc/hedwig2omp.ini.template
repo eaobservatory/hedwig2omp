@@ -3,3 +3,12 @@ file=
 
 [queue_country]
 P=PI
+
+[affiliation_code]
+ca=Canada (listed institution)
+xc=Canada (national)
+cn=China
+jp=Japan
+kr=Korea
+tw=Taiwan
+uk=United Kingdom (listed institution)
