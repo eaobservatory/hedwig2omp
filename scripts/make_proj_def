@@ -21,7 +21,10 @@
 make_proj_def - Export project definition file from Hedwig database
 
 Usage:
-    make_proj_def [-v | -q] --semester <semester> --queue <queue> [--output <filename>] [--output-affiliations <filename>]
+    make_proj_def [-v | -q] --semester <semester> --queue <queue>
+        [--output <filename>]
+        [--output-affiliations <filename>]
+        [--output-targets <filename>]
 
 Options:
 
@@ -29,6 +32,7 @@ Options:
     --queue <queue>                   Queue code
     --output, -o <filename>           Output filename
     --output-affiliations <filename>  File to which to write affiliations
+    --output-targets <filename>       File to which to write targets
     --verbose, -v                     Increase verbosity
     --quiet, -q                       Decreate verbosity
 """
@@ -49,8 +53,9 @@ from hedwig.type import ProposalState
 
 from hedwig2omp.config import get_config
 from hedwig2omp.affiliation_file import write_affiliation_file
-from hedwig2omp.type import Project
 from hedwig2omp.project_ini import write_project_ini
+from hedwig2omp.target_file import write_target_file
+from hedwig2omp.type import Project
 from hedwig2omp.user import UserDB
 
 
@@ -90,6 +95,7 @@ def main():
     queue_id = None
     affiliations = None
     assignments = OrderedDict()
+    targets = OrderedDict()
 
     for proposal in db.search_proposal(
             facility_id=facility_id,
@@ -161,6 +167,10 @@ def main():
             assignments[code] = facility.calculate_affiliation_assignment(
                 db, proposal.members, affiliations)
 
+        if args['--output-targets'] is not None:
+            # Fetch target information from the database.
+            targets[code] = db.search_target(proposal_id=proposal.id)
+
     if n_err:
         logger.info('Aborting due to {} error(s)', n_err)
         sys.exit(1)
@@ -182,6 +192,15 @@ def main():
         else:
             with open(args['--output-affiliations'], 'w') as file_:
                 write_affiliation_file(file_, *write_args)
+
+    if args['--output-targets'] is not None:
+        logger.debug('Writing targets file')
+        write_args = (targets,)
+        if args['--output-targets'] == '-':
+            write_target_file(sys.stdout, *write_args)
+        else:
+            with open(args['--output-targets'], 'w') as file_:
+                write_target_file(file_, *write_args)
 
 if __name__ == '__main__':
     main()
