@@ -21,21 +21,23 @@
 make_proj_def - Export project definition file from Hedwig database
 
 Usage:
-    make_proj_def [-v | -q] --semester <semester> --queue <queue> [--output <filename>]
+    make_proj_def [-v | -q] --semester <semester> --queue <queue> [--output <filename>] [--output-affiliations <filename>]
 
 Options:
 
-    --semester <semester>    Semester code
-    --queue <queue>          Queue code
-    --output, -o <filename>  Output filename
-    --verbose, -v            Increase verbosity
-    --quiet, -q              Decreate verbosity
+    --semester <semester>             Semester code
+    --queue <queue>                   Queue code
+    --output, -o <filename>           Output filename
+    --output-affiliations <filename>  File to which to write affiliations
+    --verbose, -v                     Increase verbosity
+    --quiet, -q                       Decreate verbosity
 """
 
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
 from codecs import utf_8_decode
+from collections import OrderedDict
 import logging
 import sys
 
@@ -46,6 +48,7 @@ from hedwig.util import get_logger
 from hedwig.type import ProposalState
 
 from hedwig2omp.config import get_config
+from hedwig2omp.affiliation_file import write_affiliation_file
 from hedwig2omp.type import Project
 from hedwig2omp.project_ini import write_project_ini
 from hedwig2omp.user import UserDB
@@ -83,6 +86,11 @@ def main():
     logger.debug('Finding accepted proposals for this call')
     proposals = []
     n_err = 0
+    call_id = None
+    queue_id = None
+    affiliations = None
+    assignments = OrderedDict()
+
     for proposal in db.search_proposal(
             facility_id=facility_id,
             semester_code=semester_code,
@@ -134,17 +142,46 @@ def main():
             tagpriority=priority,
             support=''))
 
+        if args['--output-affiliations'] is not None:
+            # Fetch affiliation information from the database if we don't have
+            # it already.
+            if affiliations is None:
+                call_id = proposal.call_id
+                queue_id = proposal.queue_id
+                affiliations = db.search_affiliation(
+                    queue_id=queue_id, hidden=False,
+                    with_weight_call_id=call_id)
+
+            elif ((call_id != proposal.call_id) or
+                    (queue_id != proposal.queue_id)):
+                logger.error('Call or queue mismatch')
+                sys.exit(1)
+
+            # Compute affiliation fractions.
+            assignments[code] = facility.calculate_affiliation_assignment(
+                db, proposal.members, affiliations)
+
     if n_err:
         logger.info('Aborting due to {} error(s)', n_err)
         sys.exit(1)
 
-    logger.debug('Writing project definition file')
-    write_args = (telescope, semester_code, proposals)
-    if args['--output'] is None:
-        write_project_ini(sys.stdout, *write_args)
-    else:
-        with open(args['--output'], 'wb') as file_:
-            write_project_ini(file_, *write_args)
+    if args['--output'] is not None:
+        logger.debug('Writing project definition file')
+        write_args = (telescope, semester_code, proposals)
+        if args['--output'] == '-':
+            write_project_ini(sys.stdout, *write_args)
+        else:
+            with open(args['--output'], 'wb') as file_:
+                write_project_ini(file_, *write_args)
+
+    if args['--output-affiliations'] is not None:
+        logger.debug('Writing affiliations file')
+        write_args = (affiliations, assignments)
+        if args['--output-affiliations'] == '-':
+            write_affiliation_file(sys.stdout, *write_args)
+        else:
+            with open(args['--output-affiliations'], 'w') as file_:
+                write_affiliation_file(file_, *write_args)
 
 if __name__ == '__main__':
     main()
