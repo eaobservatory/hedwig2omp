@@ -109,20 +109,21 @@ def main():
         # Process member list.
         pi = None
         cois = []
-        for member in proposal.members.values():
-            omp_id = users.get(member.person_id)
-            if omp_id is None:
-                logger.error('Unknown Hedwig user {} ({})',
-                             member.person_id, member.person_name)
+        if args['--output'] is not None:
+            for member in proposal.members.values():
+                omp_id = users.get(member.person_id)
+                if omp_id is None:
+                    logger.error('Unknown Hedwig user {} ({})',
+                                 member.person_id, member.person_name)
+                    n_err += 1
+                    continue
+                if member.pi and (pi is None):
+                    pi = omp_id
+                else:
+                    cois.append(omp_id)
+            if pi is None:
+                logger.error('No PI for project {}', code)
                 n_err += 1
-                continue
-            if member.pi and (pi is None):
-                pi = omp_id
-            else:
-                cois.append(omp_id)
-        if pi is None:
-            logger.error('No PI for project {}', code)
-            n_err += 1
 
         # Fetch allocation.
         allocation = db.search_jcmt_allocation(proposal_id=proposal.id)
