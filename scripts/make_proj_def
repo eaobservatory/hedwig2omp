@@ -136,7 +136,7 @@ def main():
         # Compute priority, using formula suggested by IMC:
         #     OMP priority = 300 - 4 * (TAC_rating - 50)
         rating = facility.calculate_overall_rating(proposal.reviewers)
-        priority = int(500.0 - (4.0 * rating))
+        priority = 600 if rating is None else int(500.0 - (4.0 * rating))
 
         proposals.append(Project(
             code=code,
