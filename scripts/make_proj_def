@@ -25,6 +25,7 @@ Usage:
         [--output <filename>]
         [--output-affiliations <filename>]
         [--output-targets <filename>]
+        [--include-exempt-affiliations]
 
 Options:
 
@@ -33,6 +34,7 @@ Options:
     --output, -o <filename>           Output filename
     --output-affiliations <filename>  File to which to write affiliations
     --output-targets <filename>       File to which to write targets
+    --include-exempt-affiliations     Include affiliations for exempt proposals
     --verbose, -v                     Increase verbosity
     --quiet, -q                       Decreate verbosity
 """
@@ -103,7 +105,8 @@ def main():
             queue_code=queue_code,
             state=ProposalState.ACCEPTED,
             with_members=True,
-            with_reviewers=True, with_review_info=True).values():
+            with_reviewers=True, with_review_info=True,
+            with_decision=True).values():
         code = facility.make_proposal_code(db, proposal)
 
         # Process member list.
@@ -149,7 +152,9 @@ def main():
             tagpriority=priority,
             support=''))
 
-        if args['--output-affiliations'] is not None:
+        if ((args['--output-affiliations'] is not None) and
+                (args['--include-exempt-affiliations'] or
+                 not proposal.decision_exempt)):
             # Fetch affiliation information from the database if we don't have
             # it already.
             if affiliations is None:
