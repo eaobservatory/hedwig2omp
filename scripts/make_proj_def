@@ -26,6 +26,7 @@ Usage:
         [--output-affiliations <filename>]
         [--output-targets <filename>]
         [--include-exempt-affiliations]
+        [--skip-unknown-cois]
 
 Options:
 
@@ -35,6 +36,7 @@ Options:
     --output-affiliations <filename>  File to which to write affiliations
     --output-targets <filename>       File to which to write targets
     --include-exempt-affiliations     Include affiliations for exempt proposals
+    --skip-unknown-cois               Don't abort when CoIs not recognised
     --verbose, -v                     Increase verbosity
     --quiet, -q                       Decreate verbosity
 """
@@ -116,9 +118,13 @@ def main():
             for member in proposal.members.values():
                 omp_id = users.get(member.person_id)
                 if omp_id is None:
-                    logger.error('Unknown Hedwig user {} ({})',
-                                 member.person_id, member.person_name)
-                    n_err += 1
+                    if args['--skip-unknown-cois']:
+                        logger.warning('Unknown Hedwig user {} ({})',
+                                       member.person_id, member.person_name)
+                    else:
+                        logger.error('Unknown Hedwig user {} ({})',
+                                     member.person_id, member.person_name)
+                        n_err += 1
                     continue
                 if member.pi and (pi is None):
                     pi = omp_id
