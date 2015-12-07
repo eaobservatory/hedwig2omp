@@ -21,7 +21,10 @@
 match_users - Attempt to match Hedwig users to OMP accounts
 
 Usage:
-    match_users [-v | -q] --semester <semester> --queue <queue> [--state <state>] [--skip-unregistered]
+    match_users [-v | -q] --semester <semester> --queue <queue>
+        [--state <state>]
+        [--skip-unregistered]
+        [--decision-accept]
 
 Options:
 
@@ -29,6 +32,7 @@ Options:
     --queue <queue>          Queue code
     --state <state>          Select proposals of given state [default: accepted]
     --skip-unregistered, -r  Skip unregistered proposal members
+    --decision-accept        Select only proposals marked as being accepted
     --verbose, -v            Increase verbosity
     --quiet, -q              Decreate verbosity
 """
@@ -89,6 +93,7 @@ def main():
             semester_code=semester_code,
             queue_code=queue_code,
             state=state,
+            decision_accept=(True if args['--decision-accept'] else None),
             with_members=True).values():
         for member in proposal.members.values():
             if args['--skip-unregistered'] and not member.person_registered:
