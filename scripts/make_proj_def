@@ -27,6 +27,8 @@ Usage:
         [--output-targets <filename>]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
+        [--state <state>]
+        [--decision-accept]
 
 Options:
 
@@ -37,6 +39,8 @@ Options:
     --output-targets <filename>       File to which to write targets
     --include-exempt-affiliations     Include affiliations for exempt proposals
     --skip-unknown-cois               Don't abort when CoIs not recognised
+    --state <state>                   Select proposals of given state [default: accepted]
+    --decision-accept                 Select only proposals marked as being accepted
     --verbose, -v                     Increase verbosity
     --quiet, -q                       Decreate verbosity
 """
@@ -92,7 +96,12 @@ def main():
     facility_id = db.ensure_facility(facility_class.get_code())
     facility = facility_class(facility_id)
 
-    logger.debug('Finding accepted proposals for this call')
+    state = ProposalState.by_name(args['--state'])
+    if state is None:
+        logger.error('State "{}" not recognised', args['--state'])
+        sys.exit(1)
+
+    logger.debug('Finding proposals for this call')
     proposals = []
     n_err = 0
     call_id = None
@@ -105,7 +114,8 @@ def main():
             facility_id=facility_id,
             semester_code=semester_code,
             queue_code=queue_code,
-            state=ProposalState.ACCEPTED,
+            state=state,
+            decision_accept=(True if args['--decision-accept'] else None),
             with_members=True,
             with_reviewers=True, with_review_info=True,
             with_decision=True).values():
