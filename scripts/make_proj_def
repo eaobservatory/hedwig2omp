@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-# Copyright (C) 2015 East Asian Observatory
+# Copyright (C) 2015-2016 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -25,6 +25,7 @@ Usage:
         [--output <filename>]
         [--output-affiliations <filename>]
         [--output-targets <filename>]
+        [--output-notes <filename>]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
         [--state <state>]
@@ -37,6 +38,7 @@ Options:
     --output, -o <filename>           Output filename
     --output-affiliations <filename>  File to which to write affiliations
     --output-targets <filename>       File to which to write targets
+    --output-notes <filename>         File to which to write TAC notes
     --include-exempt-affiliations     Include affiliations for exempt proposals
     --skip-unknown-cois               Don't abort when CoIs not recognised
     --state <state>                   Select proposals of given state [default: accepted]
@@ -57,10 +59,11 @@ from docopt import docopt
 
 from hedwig.config import get_database, get_facilities
 from hedwig.util import get_logger
-from hedwig.type import ProposalState
+from hedwig.type import ProposalState, ProposalText
 
 from hedwig2omp.config import get_config
 from hedwig2omp.affiliation_file import write_affiliation_file
+from hedwig2omp.notes_file import write_notes_file
 from hedwig2omp.project_ini import write_project_ini
 from hedwig2omp.target_file import write_target_file
 from hedwig2omp.type import Project
@@ -109,6 +112,7 @@ def main():
     affiliations = None
     assignments = OrderedDict()
     targets = OrderedDict()
+    notes = OrderedDict()
 
     for proposal in db.search_proposal(
             facility_id=facility_id,
@@ -118,7 +122,7 @@ def main():
             decision_accept=(True if args['--decision-accept'] else None),
             with_members=True,
             with_reviewers=True, with_review_info=True,
-            with_decision=True).values():
+            with_decision=True, with_decision_note=True).values():
         code = facility.make_proposal_code(db, proposal)
 
         # Process member list.
@@ -193,6 +197,10 @@ def main():
             # Fetch target information from the database.
             targets[code] = db.search_target(proposal_id=proposal.id)
 
+        if (args['--output-notes'] is not None) and proposal.decision_note:
+            notes[code] = ProposalText(text=proposal.decision_note,
+                                       format=proposal.decision_note_format)
+
     if n_err:
         logger.info('Aborting due to {} error(s)', n_err)
         sys.exit(1)
@@ -223,6 +231,15 @@ def main():
         else:
             with open(args['--output-targets'], 'w') as file_:
                 write_target_file(file_, *write_args)
+
+    if args['--output-notes'] is not None:
+        logger.debug('Writing notes file')
+        write_args = (notes,)
+        if args['--output-notes'] == '-':
+            write_notes_file(sys.stdout, *write_args)
+        else:
+            with open(args['--output-notes'], 'w') as file_:
+                write_notes_file(file_, *write_args)
 
 if __name__ == '__main__':
     main()
