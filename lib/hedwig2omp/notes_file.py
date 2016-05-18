@@ -21,7 +21,7 @@ from __future__ import absolute_import, division, print_function, \
 from textwrap import fill
 import re
 
-from hedwig.type import FormatType
+from hedwig.type.enum import FormatType
 
 paragraph_break = re.compile('\n\n+')
 

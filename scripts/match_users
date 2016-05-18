@@ -48,7 +48,7 @@ from docopt import docopt
 
 from hedwig.config import get_database, get_facilities
 from hedwig.util import get_logger
-from hedwig.type import ProposalState
+from hedwig.type.enum import ProposalState
 
 from hedwig2omp.config import get_config
 from hedwig2omp.omp import OMPDB
