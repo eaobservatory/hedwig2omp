@@ -163,7 +163,11 @@ def main():
                         'OMP ID for {}: '.format(
                             ascii_encode(member.person_name, 'replace')[0]))
                     if omp_id:
-                        user_db.add_user(person_id, omp_id.upper())
+                        if len(omp_id) < 3:
+                            logger.warning(
+                                'OMP ID not 3 characters long, skipping...')
+                        else:
+                            user_db.add_user(person_id, omp_id.upper())
                     else:
                         logger.info('No OMP ID entered, skipping...')
 
