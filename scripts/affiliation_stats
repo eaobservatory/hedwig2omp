@@ -1,0 +1,236 @@
+#!/usr/bin/env python2
+
+# Copyright (C) 2015-2016 East Asian Observatory
+# All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful,but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc.,51 Franklin
+# Street, Fifth Floor, Boston, MA  02110-1301, USA
+
+"""
+affiliation_stats - Export affiliation statisticcs from Hedwig database
+
+Usage:
+    affiliation_stats [-v | -q] --semester <semester> --queue <queue> --affiliation <affiliation>
+
+Options:
+
+    --semester <semester>             Semester code
+    --queue <queue>                   Queue code
+    --affiliation <affiliation>       Affiliation code
+    --verbose, -v                     Increase verbosity
+    --quiet, -q                       Decreate verbosity
+"""
+
+from __future__ import absolute_import, division, print_function, \
+    unicode_literals
+
+from codecs import utf_8_decode
+from collections import OrderedDict
+import logging
+import sys
+
+from docopt import docopt
+
+from hedwig.config import get_database, get_facilities
+from hedwig.file.csv import CSVWriter
+from hedwig.util import get_logger
+from hedwig.type.enum import ProposalState
+
+from hedwig2omp.config import get_config
+
+
+def main():
+    args = docopt(__doc__)
+
+    telescope = 'JCMT'
+    semester_code = utf_8_decode(args['--semester'])[0]
+    queue_code = utf_8_decode(args['--queue'])[0]
+    affiliation_code = utf_8_decode(args['--affiliation'])[0]
+
+    logging.basicConfig(level=(logging.DEBUG if args['--verbose']
+                               else (logging.WARNING if args['--quiet']
+                                     else logging.INFO)))
+    logger = get_logger('affiliation_stats')
+
+    logger.debug('Reading configuration')
+    config = get_config()
+
+    logger.debug('Connecting to Hedwig database')
+    db = get_database()
+    (facility_class,) = get_facilities(facility_spec=telescope)
+    facility_id = db.ensure_facility(facility_class.get_code())
+    facility = facility_class(facility_id)
+
+    if config.has_option('queue_country', queue_code):
+        country = config.get('queue_country', queue_code)
+    else:
+        country = queue_code
+
+    if config.has_option('affiliation_code', affiliation_code):
+        affiliation_name = config.get('affiliation_code', affiliation_code)
+    else:
+        affiliation_name = affiliation_code
+
+    logger.debug('Looking up queue ID')
+    for queue in db.search_queue(facility_id=facility_id).values():
+        if queue.code == queue_code:
+            queue_id = queue.id
+            break
+    else:
+        logger.error('Could not find queue code "{}"', queue_code)
+        sys.exit(1)
+
+    logger.debug('Looking up affiliation ID')
+    affiliations = OrderedDict()
+    affiliation_id = None
+    for affiliation in db.search_affiliation(queue_id=queue_id).values():
+        if affiliation.name == affiliation_name:
+            affiliation_id = affiliation.id
+        else:
+            affiliations[affiliation.id] = affiliation.name
+    if affiliation_id is None:
+        logger.error('Could not find affiliation name "{}"', affiliation_name)
+        sys.exit(1)
+
+    logger.debug('Finding proposals for this call')
+    call_id = None
+    queue_id = None
+    institutions = OrderedDict()
+    proposals = []
+
+    for proposal in db.search_proposal(
+            facility_id=facility_id,
+            semester_code=semester_code,
+            queue_code=queue_code,
+            state=(ProposalState.REVIEW,
+                   ProposalState.ACCEPTED,
+                   ProposalState.REJECTED),
+            with_members=True,
+            with_decision=True).values():
+        code = facility.make_proposal_code(db, proposal)
+
+        # Process member list.
+        pi = None
+        cois = []
+        n_coi = 0
+        n_affil = {}  # affiliations other than primary
+        n_inst = {}  # institutions for primary affiliation
+
+        for member in proposal.members.values():
+            if member.affiliation_id == affiliation_id:
+                n_inst[member.resolved_institution_id] = (
+                    n_inst.get(member.resolved_institution_id, 0) + 1)
+                if member.resolved_institution_id not in institutions:
+                    institutions[member.resolved_institution_id] = member.institution_name
+            else:
+                n_affil[member.affiliation_id] = (
+                    n_affil.get(member.affiliation_id, 0) + 1)
+
+            if member.pi and (pi is None):
+                if member.affiliation_id == affiliation_id:
+                    pi = member
+            else:
+                n_coi += 1
+                if member.affiliation_id == affiliation_id:
+                    cois.append(member)
+
+        if not (pi or cois):
+            continue
+
+        logger.debug('Processing project {}', code)
+
+        accepted = ((proposal.state == ProposalState.ACCEPTED) or
+                    ((proposal.state == ProposalState.REVIEW) and
+                     proposal.decision_accept))
+
+        # Fetch request.
+        request = db.search_jcmt_request(proposal_id=proposal.id)
+
+        # Fetch allocation.
+        allocation = db.search_jcmt_allocation(proposal_id=proposal.id)
+        if accepted and not allocation:
+            logger.error('No allocation for accepted project {}', code)
+            sys.exit(1)
+
+        if request:
+            request = request.get_total()
+        else:
+            request = None
+        if allocation and accepted:
+            allocation = allocation.get_total()
+        else:
+            allocation = None
+
+        proposals.append({
+            'code': code,
+            'pi': (pi is not None),
+            'cois': len(cois),
+            'n_coi': n_coi,
+            'accepted': accepted,
+            'request': request.total,
+            'allocation': (allocation.total if allocation is not None else None),
+            'n_affil': n_affil,
+            'n_inst': n_inst,
+            'pi_student': (pi.student if pi is not None else None),
+            'coi_students': sum([1 for x in cois if x.student]),
+        })
+
+    writer = CSVWriter()
+
+    titles = [
+        'Proposal',
+        'PI',
+        'CoIs',
+        'Total CoIs',
+        'PI students',
+        'CoI students',
+        'Accepted',
+        'Request',
+        'Allocation',
+    ]
+
+    for institution_name in institutions.values():
+        titles.append(institution_name)
+
+    for affiliation_name in affiliations.values():
+        titles.append(affiliation_name)
+
+    writer.add_row(titles)
+
+    for proposal in proposals:
+        row = [
+            proposal['code'],
+            (1 if proposal['pi'] else None),
+            (proposal['cois'] if proposal['cois'] else None),
+            proposal['n_coi'],
+            (1 if proposal['pi_student'] else None),
+            (proposal['coi_students'] if proposal['coi_students'] else None),
+            (1 if proposal['accepted'] else 0),
+            proposal['request'],
+            proposal['allocation'],
+        ]
+
+        for institution in institutions.keys():
+            row.append(proposal['n_inst'].get(institution))
+
+        for affiliation in affiliations.keys():
+            row.append(proposal['n_affil'].get(affiliation))
+
+        writer.add_row(row)
+
+    print(writer.get_csv())
+
+
+if __name__ == '__main__':
+    main()
