@@ -26,6 +26,7 @@ Usage:
         [--output-affiliations <filename>]
         [--output-targets <filename>]
         [--output-notes <filename>]
+        [--output-feedback <filename>]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
         [--state <state>]
@@ -40,6 +41,7 @@ Options:
     --output-affiliations <filename>  File to which to write affiliations
     --output-targets <filename>       File to which to write targets
     --output-notes <filename>         File to which to write TAC notes
+    --output-feedback <filename>      File to which to write TAC feedback
     --include-exempt-affiliations     Include affiliations for exempt proposals
     --skip-unknown-cois               Don't abort when CoIs not recognised
     --state <state>                   Select proposals of given state [default: accepted]
@@ -61,7 +63,7 @@ from docopt import docopt
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
-from hedwig.type.enum import ProposalState
+from hedwig.type.enum import FormatType, ProposalState
 from hedwig.type.simple import ProposalText
 
 from hedwig2omp.config import get_config
@@ -122,6 +124,8 @@ def main():
     assignments = OrderedDict()
     targets = OrderedDict()
     notes = OrderedDict()
+    feedback = OrderedDict()
+    role_class = facility.get_reviewer_roles()
 
     for proposal in db.search_proposal(
             facility_id=facility_id,
@@ -131,7 +135,7 @@ def main():
             state=state,
             decision_accept=(True if args['--decision-accept'] else None),
             with_members=True,
-            with_reviewers=True, with_review_info=True,
+            with_reviewers=True, with_review_info=True, with_review_text=True,
             with_decision=True, with_decision_note=True).values():
         code = facility.make_proposal_code(db, proposal)
 
@@ -211,6 +215,18 @@ def main():
             notes[code] = ProposalText(text=proposal.decision_note,
                                        format=proposal.decision_note_format)
 
+        if (args['--output-feedback'] is not None):
+            feedback_reviews = proposal.reviewers.values_by_role(
+                role_class.FEEDBACK)
+            if len(feedback_reviews) == 1:
+                feedback[code] = ProposalText(
+                    text=feedback_reviews[0].review_text,
+                    format=feedback_reviews[0].review_format)
+            elif len(feedback_reviews) > 1:
+                feedback[code] = ProposalText(
+                    text='Multiple feedback messages: please view online.',
+                    format=FormatType.PLAIN)
+
     if n_err:
         logger.info('Aborting due to {} error(s)', n_err)
         sys.exit(1)
@@ -250,6 +266,16 @@ def main():
         else:
             with open(args['--output-notes'], 'w') as file_:
                 write_notes_file(file_, *write_args)
+
+    if args['--output-feedback'] is not None:
+        logger.debug('Writing feedback file')
+        write_args = (feedback,)
+        if args['--output-feedback'] == '-':
+            write_notes_file(sys.stdout, *write_args)
+        else:
+            with open(args['--output-feedback'], 'w') as file_:
+                write_notes_file(file_, *write_args)
+
 
 if __name__ == '__main__':
     main()
