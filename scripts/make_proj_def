@@ -127,7 +127,7 @@ def main():
     feedback = OrderedDict()
     role_class = facility.get_reviewer_roles()
 
-    for proposal in db.search_proposal(
+    proposal_collection = db.search_proposal(
             facility_id=facility_id,
             semester_code=semester_code,
             queue_code=queue_code,
@@ -136,7 +136,11 @@ def main():
             decision_accept=(True if args['--decision-accept'] else None),
             with_members=True,
             with_reviewers=True, with_review_info=True, with_review_text=True,
-            with_decision=True, with_decision_note=True).values():
+            with_decision=True, with_decision_note=True)
+
+    facility.attach_review_extra(db, proposal_collection)
+
+    for proposal in proposal_collection.values():
         code = facility.make_proposal_code(db, proposal)
 
         # Process member list.
