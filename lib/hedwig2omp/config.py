@@ -29,7 +29,8 @@ def get_config():
     global config
 
     if config is None:
-        file_ = os.path.join('etc', 'hedwig2omp.ini')
+        dir_ = os.environ.get('HEDWIG2OMP_DIR', os.getcwd())
+        file_ = os.path.join(dir_, 'etc', 'hedwig2omp.ini')
         config = SafeConfigParser()
         config.read(file_)
 
