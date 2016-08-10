@@ -21,7 +21,7 @@
 make_proj_def - Export project definition file from Hedwig database
 
 Usage:
-    make_proj_def [-v | -q] --semester <semester> --queue <queue>
+    make_proj_def [-v | -q] --semester <semester> --queue <queue> --type <type>
         [--output <filename>]
         [--output-affiliations <filename>]
         [--output-targets <filename>]
@@ -35,6 +35,7 @@ Options:
 
     --semester <semester>             Semester code
     --queue <queue>                   Queue code
+    --type <type>                     Call type code
     --output, -o <filename>           Output filename
     --output-affiliations <filename>  File to which to write affiliations
     --output-targets <filename>       File to which to write targets
@@ -58,6 +59,7 @@ import sys
 from docopt import docopt
 
 from hedwig.config import get_database, get_facilities
+from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
 from hedwig.type.enum import ProposalState
 from hedwig.type.simple import ProposalText
@@ -105,6 +107,12 @@ def main():
         logger.error('State "{}" not recognised', args['--state'])
         sys.exit(1)
 
+    try:
+        call_type = facility.get_call_types().by_code(args['--type'])
+    except NoSuchValue:
+        logger.error('Type "{}" not recognised', args['--type'])
+        sys.exit(1)
+
     logger.debug('Finding proposals for this call')
     proposals = []
     n_err = 0
@@ -119,6 +127,7 @@ def main():
             facility_id=facility_id,
             semester_code=semester_code,
             queue_code=queue_code,
+            call_type=call_type,
             state=state,
             decision_accept=(True if args['--decision-accept'] else None),
             with_members=True,

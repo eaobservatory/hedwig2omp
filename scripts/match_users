@@ -21,7 +21,7 @@
 match_users - Attempt to match Hedwig users to OMP accounts
 
 Usage:
-    match_users [-v | -q] --semester <semester> --queue <queue>
+    match_users [-v | -q] --semester <semester> --queue <queue> --type <type>
         [--state <state>]
         [--skip-unregistered]
         [--decision-accept]
@@ -30,6 +30,7 @@ Options:
 
     --semester <semester>    Semester code
     --queue <queue>          Queue code
+    --type <type>            Call type code
     --state <state>          Select proposals of given state [default: accepted]
     --skip-unregistered, -r  Skip unregistered proposal members
     --decision-accept        Select only proposals marked as being accepted
@@ -47,6 +48,7 @@ import sys
 from docopt import docopt
 
 from hedwig.config import get_database, get_facilities
+from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
 from hedwig.type.enum import ProposalState
 
@@ -86,12 +88,19 @@ def main():
         logger.error('State "{}" not recognised', args['--state'])
         sys.exit(1)
 
+    try:
+        call_type = facility.get_call_types().by_code(args['--type'])
+    except NoSuchValue:
+        logger.error('Type "{}" not recognised', args['--type'])
+        sys.exit(1)
+
     logger.debug('Finding proposals for this call')
     considered = set()
     for proposal in db.search_proposal(
             facility_id=facility_id,
             semester_code=semester_code,
             queue_code=queue_code,
+            call_type=call_type,
             state=state,
             decision_accept=(True if args['--decision-accept'] else None),
             with_members=True).values():
