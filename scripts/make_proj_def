@@ -140,6 +140,11 @@ def main():
 
     facility.attach_review_extra(db, proposal_collection)
 
+    proposal_ids = [x.id for x in proposal_collection.values()]
+    jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
+    if args['--output-targets'] is not None:
+        all_targets = db.search_target(proposal_id=proposal_ids)
+
     for proposal in proposal_collection.values():
         code = facility.make_proposal_code(db, proposal)
 
@@ -167,7 +172,7 @@ def main():
                 n_err += 1
 
         # Fetch allocation.
-        allocation = db.search_jcmt_allocation(proposal_id=proposal.id)
+        allocation = jcmt_allocations.subset_by_proposal(proposal.id)
         if not allocation:
             logger.error('No allocation for project {}', code)
             n_err += 1
@@ -213,7 +218,7 @@ def main():
 
         if args['--output-targets'] is not None:
             # Fetch target information from the database.
-            targets[code] = db.search_target(proposal_id=proposal.id)
+            targets[code] = all_targets.subset_by_proposal(proposal.id)
 
         if (args['--output-notes'] is not None) and proposal.decision_note:
             notes[code] = ProposalText(text=proposal.decision_note,
