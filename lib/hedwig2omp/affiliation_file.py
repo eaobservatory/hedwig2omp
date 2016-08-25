@@ -44,6 +44,11 @@ def write_affiliation_file(file_, affiliations, assignments):
     lines = []
     for (project, assignment) in assignments.items():
         for (affiliation, fraction) in assignment.items():
+            if affiliation == 0:
+                logger.warning(
+                    'Project {} includes unknown assignment', project)
+                continue
+
             code = affiliation_codes.get(affiliation)
             if code is None:
                 if affiliation in affiliations:
