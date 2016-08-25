@@ -52,3 +52,6 @@ def write_target_file(file_, targets):
 
     # Write the JSON file.
     json.dump(target_objects, file_, indent=4, separators=(',', ': '))
+
+    # Add final line feed.
+    print('', file=file_)
