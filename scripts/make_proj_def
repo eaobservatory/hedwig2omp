@@ -31,12 +31,21 @@ Usage:
         [--skip-unknown-cois]
         [--state <state>]
         [--decision-accept]
+    make_proj_def [-v | -q] --project <project>
+        [--output <filename>]
+        [--output-affiliations <filename>]
+        [--output-targets <filename>]
+        [--output-notes <filename>]
+        [--output-feedback <filename>]
+        [--include-exempt-affiliations]
+        [--skip-unknown-cois]
 
 Options:
 
     --semester <semester>             Semester code
     --queue <queue>                   Queue code
     --type <type>                     Call type code
+    --project <project>               Specific project identifier
     --output, -o <filename>           Output filename
     --output-affiliations <filename>  File to which to write affiliations
     --output-targets <filename>       File to which to write targets
@@ -79,8 +88,6 @@ def main():
     args = docopt(__doc__)
 
     telescope = 'JCMT'
-    semester_code = utf_8_decode(args['--semester'])[0]
-    queue_code = utf_8_decode(args['--queue'])[0]
 
     logging.basicConfig(level=(logging.DEBUG if args['--verbose']
                                else (logging.WARNING if args['--quiet']
@@ -89,11 +96,6 @@ def main():
 
     logger.debug('Reading configuration')
     config = get_config()
-
-    if config.has_option('queue_country', queue_code):
-        country = config.get('queue_country', queue_code)
-    else:
-        country = queue_code
 
     logger.debug('Reading user lookup table')
     users = UserDB().get_all_users()
@@ -104,18 +106,58 @@ def main():
     facility_id = db.ensure_facility(facility_class.get_code())
     facility = facility_class(facility_id)
 
-    state = ProposalState.by_name(args['--state'])
-    if state is None:
-        logger.error('State "{}" not recognised', args['--state'])
-        sys.exit(1)
+    query_kwargs = {
+        'facility_id': facility_id,
+        'decision_accept': (True if args['--decision-accept'] else None),
+        'with_members': True,
+        'with_reviewers': True,
+        'with_review_info': True,
+        'with_review_text': True,
+        'with_decision': True,
+        'with_decision_note': True,
+    }
 
-    try:
-        call_type = facility.get_call_types().by_code(args['--type'])
-    except NoSuchValue:
-        logger.error('Type "{}" not recognised', args['--type'])
-        sys.exit(1)
+    if args['--project'] is None:
+        state = ProposalState.by_name(args['--state'])
+        if state is None:
+            logger.error('State "{}" not recognised', args['--state'])
+            sys.exit(1)
 
-    logger.debug('Finding proposals for this call')
+        try:
+            call_type = facility.get_call_types().by_code(args['--type'])
+        except NoSuchValue:
+            logger.error('Type "{}" not recognised', args['--type'])
+            sys.exit(1)
+
+        semester_code = utf_8_decode(args['--semester'])[0]
+        queue_code = utf_8_decode(args['--queue'])[0]
+
+        logger.debug('Finding proposals for this call')
+        proposal_collection = db.search_proposal(
+            call_type=call_type,
+            semester_code=semester_code,
+            queue_code=queue_code,
+            state=state,
+            **query_kwargs)
+
+    else:
+        logger.debug('Searching for specific proposal by identifier')
+
+        project_code = utf_8_decode(args['--project'])[0]
+        proposal_collection = db.search_proposal(
+            proposal_id=facility.parse_proposal_code(db, project_code),
+            **query_kwargs)
+
+        proposal = proposal_collection.get_single()
+        semester_code = proposal.semester_code
+        queue_code = proposal.queue_code
+
+    logger.debug('Determining OMP country code')
+    if config.has_option('queue_country', queue_code):
+        country = config.get('queue_country', queue_code)
+    else:
+        country = queue_code
+
     proposals = []
     n_err = 0
     call_id = None
@@ -126,17 +168,6 @@ def main():
     notes = OrderedDict()
     feedback = OrderedDict()
     role_class = facility.get_reviewer_roles()
-
-    proposal_collection = db.search_proposal(
-            facility_id=facility_id,
-            semester_code=semester_code,
-            queue_code=queue_code,
-            call_type=call_type,
-            state=state,
-            decision_accept=(True if args['--decision-accept'] else None),
-            with_members=True,
-            with_reviewers=True, with_review_info=True, with_review_text=True,
-            with_decision=True, with_decision_note=True)
 
     facility.attach_review_extra(db, proposal_collection)
 
