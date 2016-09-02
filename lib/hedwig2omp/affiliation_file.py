@@ -1,4 +1,4 @@
-# Copyright (C) 2015 East Asian Observatory
+# Copyright (C) 2015-2016 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -47,14 +47,15 @@ def write_affiliation_file(file_, affiliations, assignments):
             if affiliation == 0:
                 logger.warning(
                     'Project {} includes unknown assignment', project)
-                continue
+                code = 'zz'
 
-            code = affiliation_codes.get(affiliation)
-            if code is None:
-                if affiliation in affiliations:
-                    affiliation = affiliations[affiliation].name
-                logger.error('Unknown affiliation: {}', affiliation)
-                sys.exit(1)
+            else:
+                code = affiliation_codes.get(affiliation)
+                if code is None:
+                    if affiliation in affiliations:
+                        affiliation = affiliations[affiliation].name
+                    logger.error('Unknown affiliation: {}', affiliation)
+                    sys.exit(1)
 
             lines.append((project, code, fraction))
 
