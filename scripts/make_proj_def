@@ -27,6 +27,7 @@ Usage:
         [--output-targets <filename>]
         [--output-notes <filename>]
         [--output-feedback <filename>]
+        [--output-publications <filename>]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
         [--state <state>]
@@ -37,6 +38,7 @@ Usage:
         [--output-targets <filename>]
         [--output-notes <filename>]
         [--output-feedback <filename>]
+        [--output-publications <filename>]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
 
@@ -51,6 +53,7 @@ Options:
     --output-targets <filename>       File to which to write targets
     --output-notes <filename>         File to which to write TAC notes
     --output-feedback <filename>      File to which to write TAC feedback
+    --output-publications <filename>  File to which to write publication information
     --include-exempt-affiliations     Include affiliations for exempt proposals
     --skip-unknown-cois               Don't abort when CoIs not recognised
     --state <state>                   Select proposals of given state [default: accepted]
@@ -78,6 +81,7 @@ from hedwig.type.simple import ProposalText
 from hedwig2omp.config import get_config
 from hedwig2omp.affiliation_file import write_affiliation_file
 from hedwig2omp.notes_file import write_notes_file
+from hedwig2omp.prev_prop_pub import write_prev_prop_pub
 from hedwig2omp.project_ini import write_project_ini
 from hedwig2omp.target_file import write_target_file
 from hedwig2omp.type import Project
@@ -118,10 +122,12 @@ def main():
     }
 
     if args['--project'] is None:
-        state = ProposalState.by_name(args['--state'])
-        if state is None:
-            logger.error('State "{}" not recognised', args['--state'])
-            sys.exit(1)
+        if args['--state'].lower() != 'any':
+            state = ProposalState.by_name(args['--state'])
+            if state is None:
+                logger.error('State "{}" not recognised', args['--state'])
+                sys.exit(1)
+            query_kwargs['state'] = state
 
         try:
             call_type = facility.get_call_types().by_code(args['--type'])
@@ -137,7 +143,6 @@ def main():
             call_type=call_type,
             semester_code=semester_code,
             queue_code=queue_code,
-            state=state,
             **query_kwargs)
 
     else:
@@ -167,6 +172,7 @@ def main():
     targets = OrderedDict()
     notes = OrderedDict()
     feedback = OrderedDict()
+    prev_proposals = OrderedDict()
     role_class = facility.get_reviewer_roles()
 
     facility.attach_review_extra(db, proposal_collection)
@@ -176,6 +182,8 @@ def main():
         jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
     if args['--output-targets'] is not None:
         all_targets = db.search_target(proposal_id=proposal_ids)
+    if args['--output-publications'] is not None:
+        all_prev_proposals = db.search_prev_proposal(proposal_id=proposal_ids)
 
     for proposal in proposal_collection.values():
         code = facility.make_proposal_code(db, proposal)
@@ -268,6 +276,10 @@ def main():
                     text='Multiple feedback messages: please view online.',
                     format=FormatType.PLAIN)
 
+        if (args['--output-publications'] is not None):
+            prev_proposals[code] = all_prev_proposals.subset_by_this_proposal(
+                proposal.id)
+
     if n_err:
         logger.info('Aborting due to {} error(s)', n_err)
         sys.exit(1)
@@ -316,6 +328,15 @@ def main():
         else:
             with open(args['--output-feedback'], 'w') as file_:
                 write_notes_file(file_, *write_args)
+
+    if args['--output-publications'] is not None:
+        logger.debug('Writing previous proposal publications')
+        write_args = (prev_proposals,)
+        if args['--output-publications'] == '-':
+            write_prev_prop_pub(sys.stdout, *write_args)
+        else:
+            with open(args['--output-publications'], 'wb') as file_:
+                write_prev_prop_pub(file_, *write_args)
 
 
 if __name__ == '__main__':
