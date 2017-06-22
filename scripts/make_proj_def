@@ -122,12 +122,14 @@ def main():
     }
 
     if args['--project'] is None:
-        if args['--state'].lower() != 'any':
+        if args['--state'].lower() == 'any':
+            # Assume "any" means any submitted state.
+            state = ProposalState.submitted_states()
+        else:
             state = ProposalState.by_name(args['--state'])
             if state is None:
                 logger.error('State "{}" not recognised', args['--state'])
                 sys.exit(1)
-            query_kwargs['state'] = state
 
         try:
             call_type = facility.get_call_types().by_code(args['--type'])
@@ -143,6 +145,7 @@ def main():
             call_type=call_type,
             semester_code=semester_code,
             queue_code=queue_code,
+            state=state,
             **query_kwargs)
 
     else:
