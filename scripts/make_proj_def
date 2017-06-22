@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-# Copyright (C) 2015-2016 East Asian Observatory
+# Copyright (C) 2015-2017 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -28,6 +28,7 @@ Usage:
         [--output-notes <filename>]
         [--output-feedback <filename>]
         [--output-publications <filename>]
+        [--output-json <filename]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
         [--state <state>]
@@ -39,6 +40,7 @@ Usage:
         [--output-notes <filename>]
         [--output-feedback <filename>]
         [--output-publications <filename>]
+        [--output-json <filename]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
 
@@ -54,6 +56,7 @@ Options:
     --output-notes <filename>         File to which to write TAC notes
     --output-feedback <filename>      File to which to write TAC feedback
     --output-publications <filename>  File to which to write publication information
+    --output-json <filename>          File to which to write proposal list as JSON
     --include-exempt-affiliations     Include affiliations for exempt proposals
     --skip-unknown-cois               Don't abort when CoIs not recognised
     --state <state>                   Select proposals of given state [default: accepted]
@@ -75,7 +78,7 @@ from docopt import docopt
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
-from hedwig.type.enum import FormatType, ProposalState
+from hedwig.type.enum import Assessment, FormatType, ProposalState
 from hedwig.type.simple import ProposalText
 
 from hedwig2omp.config import get_config
@@ -83,6 +86,7 @@ from hedwig2omp.affiliation_file import write_affiliation_file
 from hedwig2omp.notes_file import write_notes_file
 from hedwig2omp.prev_prop_pub import write_prev_prop_pub
 from hedwig2omp.project_ini import write_project_ini
+from hedwig2omp.project_list_json import write_json_file
 from hedwig2omp.target_file import write_target_file
 from hedwig2omp.type import Project
 from hedwig2omp.user import UserDB
@@ -110,6 +114,8 @@ def main():
     facility_id = db.ensure_facility(facility_class.get_code())
     facility = facility_class(facility_id)
 
+    with_json = (args['--output-json'] is not None)
+
     query_kwargs = {
         'facility_id': facility_id,
         'decision_accept': (True if args['--decision-accept'] else None),
@@ -119,6 +125,7 @@ def main():
         'with_review_text': True,
         'with_decision': True,
         'with_decision_note': True,
+        'with_categories': with_json,
     }
 
     if args['--project'] is None:
@@ -167,10 +174,12 @@ def main():
         country = queue_code
 
     proposals = []
+    proposal_details = {}
     n_err = 0
     call_id = None
     queue_id = None
     affiliations = None
+    affiliation_names = {}
     assignments = OrderedDict()
     targets = OrderedDict()
     notes = OrderedDict()
@@ -181,11 +190,14 @@ def main():
     facility.attach_review_extra(db, proposal_collection)
 
     proposal_ids = [x.id for x in proposal_collection.values()]
-    if args['--output'] is not None:
+    if (args['--output'] is not None) or with_json:
         jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
-    if args['--output-targets'] is not None:
+    if with_json:
+        jcmt_requests = db.search_jcmt_request(proposal_id=proposal_ids)
+        jcmt_options = db.search_jcmt_options(proposal_id=proposal_ids)
+    if (args['--output-targets'] is not None) or with_json:
         all_targets = db.search_target(proposal_id=proposal_ids)
-    if args['--output-publications'] is not None:
+    if (args['--output-publications'] is not None) or with_json:
         all_prev_proposals = db.search_prev_proposal(proposal_id=proposal_ids)
 
     for proposal in proposal_collection.values():
@@ -201,11 +213,31 @@ def main():
     for proposal in proposal_collection.values():
         code = facility.make_proposal_code(db, proposal)
 
+        if with_json:
+            # Add proposal details to the list.
+            proposal_detail = proposal._asdict()
+            proposal_details[code] = proposal_detail
+
+            # Replace state enum value with a names.
+            proposal_detail['state'] = ProposalState.get_name(proposal.state)
+
         # Process member list.
         pi = None
         cois = []
-        if args['--output'] is not None:
+        member_pi = None
+        member_cois = []
+
+        if (args['--output'] is not None) or with_json:
             for member in proposal.members.values():
+                # Record actual member objects for JSON output.
+                is_pi = member.pi and (member_pi is None)
+
+                if is_pi:
+                    member_pi = member
+                else:
+                    member_cois.append(member)
+
+                # Attempt to get OMP ID for OMP project file output.
                 omp_id = users.get(member.person_id)
                 if omp_id is None:
                     if args['--skip-unknown-cois']:
@@ -216,11 +248,13 @@ def main():
                                      member.person_id, member.person_name)
                         n_err += 1
                     continue
-                if member.pi and (pi is None):
+
+                if is_pi:
                     pi = omp_id
                 else:
                     cois.append(omp_id)
-            if pi is None:
+
+            if member_pi is None:
                 logger.error('No PI for project {}', code)
                 n_err += 1
 
@@ -229,8 +263,10 @@ def main():
             if not allocation:
                 logger.error('No allocation for project {}', code)
                 n_err += 1
-            allocation = allocation.get_total()
-            bands = [x for x in range(1, 6) if allocation.weather.get(x, False)]
+            allocation_total = allocation.get_total()
+            bands = [
+                x for x in range(1, 6)
+                if allocation_total.weather.get(x, False)]
 
             # Compute priority, using formula suggested by IMC:
             #     OMP priority = 300 - 4 * (TAC_rating - 50)
@@ -244,13 +280,39 @@ def main():
                 cois=cois,
                 title=proposal.title,
                 bands=bands,
-                allocation=allocation.total,
+                allocation=allocation_total.total,
                 tagpriority=priority,
                 support=''))
 
-        if ((args['--output-affiliations'] is not None) and
-                (args['--include-exempt-affiliations'] or
-                 not proposal.decision_exempt)):
+            if with_json:
+                del proposal_detail['member']
+                del proposal_detail['members']
+                del proposal_detail['reviewer']
+                del proposal_detail['reviewers']
+
+                proposal_detail['omp_pi'] = pi
+                proposal_detail['omp_cois'] = cois
+                proposal_detail['omp_bands'] = bands
+                proposal_detail['omp_priority'] = priority
+                proposal_detail['rating'] = rating
+                proposal_detail['request'] = \
+                    jcmt_requests.subset_by_proposal(proposal.id)
+                proposal_detail['allocation'] = allocation
+                proposal_detail['jcmt_options'] = \
+                    jcmt_options.subset_by_proposal(
+                        proposal.id).get_single(default=None)
+                proposal_detail['member_pi'] = member_pi
+                proposal_detail['member_cois'] = member_cois
+
+                reviews_technical = proposal.reviewers.values_by_role(
+                    role_class.TECH)
+                proposal_detail['review_technical'] = (
+                    None if (len(reviews_technical) != 1) else
+                    reviews_technical[0]._replace(
+                        review_assessment=Assessment.get_name(
+                            reviews_technical[0].review_assessment)))
+
+        if (args['--output-affiliations'] is not None) or with_json:
             # Fetch affiliation information from the database if we don't have
             # it already.
             if affiliations is None:
@@ -260,18 +322,36 @@ def main():
                     queue_id=queue_id, hidden=False,
                     with_weight_call_id=call_id)
 
+                # Make lookup table for the JSON output.
+                affiliation_names[0] = 'Unknown'
+                for affiliation in affiliations.values():
+                    affiliation_names[affiliation.id] = affiliation.name
+
             elif ((call_id != proposal.call_id) or
                     (queue_id != proposal.queue_id)):
                 logger.error('Call or queue mismatch')
                 sys.exit(1)
 
             # Compute affiliation fractions.
-            assignments[code] = facility.calculate_affiliation_assignment(
+            proposal_assignment = facility.calculate_affiliation_assignment(
                 db, proposal.members, affiliations)
 
-        if args['--output-targets'] is not None:
+            if (args['--include-exempt-affiliations']
+                    or not proposal.decision_exempt):
+                assignments[code] = proposal_assignment
+
+            if with_json:
+                proposal_detail['affiliation_assignment'] = {
+                    affiliation_names.get(k, 'Bad value'): v
+                    for (k, v) in proposal_assignment.items()}
+
+        if (args['--output-targets'] is not None) or with_json:
             # Fetch target information from the database.
-            targets[code] = all_targets.subset_by_proposal(proposal.id)
+            proposal_targets = all_targets.subset_by_proposal(proposal.id)
+            targets[code] = proposal_targets
+
+            if with_json:
+                proposal_detail['targets'] = proposal_targets
 
         if (args['--output-notes'] is not None) and proposal.decision_note:
             notes[code] = ProposalText(text=proposal.decision_note,
@@ -289,9 +369,13 @@ def main():
                     text='Multiple feedback messages: please view online.',
                     format=FormatType.PLAIN)
 
-        if (args['--output-publications'] is not None):
-            prev_proposals[code] = all_prev_proposals.subset_by_this_proposal(
-                proposal.id)
+        if (args['--output-publications'] is not None) or with_json:
+            proposal_prev_proposals = \
+                all_prev_proposals.subset_by_this_proposal(proposal.id)
+            prev_proposals[code] = proposal_prev_proposals
+
+            if with_json:
+                proposal_detail['prev_proposals'] = proposal_prev_proposals
 
     if n_err:
         logger.info('Aborting due to {} error(s)', n_err)
@@ -350,6 +434,15 @@ def main():
         else:
             with open(args['--output-publications'], 'wb') as file_:
                 write_prev_prop_pub(file_, *write_args)
+
+    if with_json:
+        logger.debug('Writing proposal list in JSON format')
+        write_args = (proposal_details,)
+        if args['--output-json'] == '-':
+            write_json_file(sys.stdout, *write_args)
+        else:
+            with open(args['--output-json'], 'w') as file_:
+                write_json_file(file_, *write_args)
 
 
 if __name__ == '__main__':
