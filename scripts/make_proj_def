@@ -189,6 +189,16 @@ def main():
         all_prev_proposals = db.search_prev_proposal(proposal_id=proposal_ids)
 
     for proposal in proposal_collection.values():
+        to_delete = []
+        for member in proposal.members.values():
+            if member.affiliation_name == 'Invalid':
+                logger.warning('Skipping "invalid" affiliation person {} ({})',
+                               member.person_id, member.person_name)
+                to_delete.append(member.id)
+        for member_id in to_delete:
+            del proposal.members[member_id]
+
+    for proposal in proposal_collection.values():
         code = facility.make_proposal_code(db, proposal)
 
         # Process member list.
