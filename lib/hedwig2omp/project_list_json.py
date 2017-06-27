@@ -42,7 +42,7 @@ def filter_object(obj_):
         result = obj_._replace(
             instrument=JCMTInstrument.get_name(obj_.instrument),
             ancillary=(None if (obj_.ancillary == 0) else
-                       JCMTInstrument.get_name(obj_.ancillary)),
+                       JCMTAncillary.get_name(obj_.ancillary)),
             weather=JCMTWeather.get_name(obj_.weather),
         )._asdict()
 
