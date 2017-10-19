@@ -71,4 +71,5 @@ def write_json_file(file_, proposal_details):
     json.dump(
         filter_object(proposal_details), file_,
         indent=4, separators=(',', ': '),
+        sort_keys=True,
         default=default_object)
