@@ -70,6 +70,7 @@ from __future__ import absolute_import, division, print_function, \
 
 from codecs import utf_8_decode
 from collections import OrderedDict
+from contextlib import contextmanager
 import logging
 import sys
 
@@ -387,66 +388,48 @@ def main():
 
     if args['--output'] is not None:
         logger.debug('Writing project definition file')
-        write_args = (telescope, semester_code, proposals)
-        if args['--output'] == '-':
-            write_project_ini(sys.stdout, *write_args)
-        else:
-            with open(args['--output'], 'wb') as file_:
-                write_project_ini(file_, *write_args)
+        with file_or_stdout(args['--output'], 'wb') as file_:
+            write_project_ini(file_, telescope, semester_code, proposals)
 
     if args['--output-affiliations'] is not None:
         logger.debug('Writing affiliations file')
-        write_args = (affiliations, assignments)
-        if args['--output-affiliations'] == '-':
-            write_affiliation_file(sys.stdout, *write_args)
-        else:
-            with open(args['--output-affiliations'], 'w') as file_:
-                write_affiliation_file(file_, *write_args)
+        with file_or_stdout(args['--output-affiliations']) as file_:
+            write_affiliation_file(file_, affiliations, assignments)
 
     if args['--output-targets'] is not None:
         logger.debug('Writing targets file')
-        write_args = (targets,)
-        if args['--output-targets'] == '-':
-            write_target_file(sys.stdout, *write_args)
-        else:
-            with open(args['--output-targets'], 'w') as file_:
-                write_target_file(file_, *write_args)
+        with file_or_stdout(args['--output-targets']) as file_:
+            write_target_file(file_, targets)
 
     if args['--output-notes'] is not None:
         logger.debug('Writing notes file')
-        write_args = (notes,)
-        if args['--output-notes'] == '-':
-            write_notes_file(sys.stdout, *write_args)
-        else:
-            with open(args['--output-notes'], 'w') as file_:
-                write_notes_file(file_, *write_args)
+        with file_or_stdout(args['--output-notes']) as file_:
+            write_notes_file(file_, notes)
 
     if args['--output-feedback'] is not None:
         logger.debug('Writing feedback file')
-        write_args = (feedback,)
-        if args['--output-feedback'] == '-':
-            write_notes_file(sys.stdout, *write_args)
-        else:
-            with open(args['--output-feedback'], 'w') as file_:
-                write_notes_file(file_, *write_args)
+        with file_or_stdout(args['--output-feedback']) as file_:
+            write_notes_file(file_, feedback)
 
     if args['--output-publications'] is not None:
         logger.debug('Writing previous proposal publications')
-        write_args = (prev_proposals,)
-        if args['--output-publications'] == '-':
-            write_prev_prop_pub(sys.stdout, *write_args)
-        else:
-            with open(args['--output-publications'], 'wb') as file_:
-                write_prev_prop_pub(file_, *write_args)
+        with file_or_stdout(args['--output-publications']) as file_:
+            write_prev_prop_pub(file_, prev_proposals)
 
     if with_json:
         logger.debug('Writing proposal list in JSON format')
-        write_args = (proposal_details,)
-        if args['--output-json'] == '-':
-            write_json_file(sys.stdout, *write_args)
-        else:
-            with open(args['--output-json'], 'w') as file_:
-                write_json_file(file_, *write_args)
+        with file_or_stdout(args['--output-json']) as file_:
+            write_json_file(file_, proposal_details)
+
+
+@contextmanager
+def file_or_stdout(filename, mode='w'):
+    if filename == '-':
+        yield sys.stdout
+
+    else:
+        with open(filename, mode) as file_:
+            yield file_
 
 
 if __name__ == '__main__':
