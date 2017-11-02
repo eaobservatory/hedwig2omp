@@ -180,6 +180,7 @@ def main():
     call_id = None
     queue_id = None
     affiliations = None
+    affiliation_codes = {}
     affiliation_names = {}
     assignments = OrderedDict()
     targets = OrderedDict()
@@ -317,7 +318,8 @@ def main():
                         review_assessment=Assessment.get_name(
                             reviews_technical[0].review_assessment)))
 
-        if (args['--output-affiliations'] is not None) or with_json:
+        if ((args['--output'] is not None)
+                or (args['--output-affiliations'] is not None) or with_json):
             # Fetch affiliation information from the database if we don't have
             # it already.
             if affiliations is None:
@@ -331,6 +333,16 @@ def main():
                 affiliation_names[0] = 'Unknown'
                 for affiliation in affiliations.values():
                     affiliation_names[affiliation.id] = affiliation.name
+
+                # Make lookup table for the affiliations and project files.
+                affiliation_codes[0] = 'zz'
+                for affiliation_code in config.options('affiliation_code'):
+                    affiliation_name = config.get(
+                        'affiliation_code', affiliation_code)
+                    for affiliation in affiliations.values():
+                        if affiliation.name == affiliation_name:
+                            affiliation_codes[affiliation.id] = \
+                                affiliation_code
 
             elif ((call_id != proposal.call_id) or
                     (queue_id != proposal.queue_id)):
@@ -394,7 +406,7 @@ def main():
     if args['--output-affiliations'] is not None:
         logger.debug('Writing affiliations file')
         with file_or_stdout(args['--output-affiliations']) as file_:
-            write_affiliation_file(file_, affiliations, assignments)
+            write_affiliation_file(file_, affiliation_codes, assignments)
 
     if args['--output-targets'] is not None:
         logger.debug('Writing targets file')

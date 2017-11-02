@@ -22,24 +22,13 @@ import sys
 
 from hedwig.util import get_logger
 
-from hedwig2omp.config import get_config
-
 logger = get_logger(__name__)
 
 
-def write_affiliation_file(file_, affiliations, assignments):
+def write_affiliation_file(file_, affiliation_codes, assignments):
     """
     Write an OMP affiliations file to the specified file handle.
     """
-
-    # Make affiliation lookup table.
-    affiliation_codes = {}
-    config = get_config()
-    for affiliation_code in config.options('affiliation_code'):
-        affiliation_name = config.get('affiliation_code', affiliation_code)
-        for affiliation in affiliations.values():
-            if affiliation.name == affiliation_name:
-                affiliation_codes[affiliation.id] = affiliation_code
 
     lines = []
     for (project, assignment) in assignments.items():
@@ -47,15 +36,11 @@ def write_affiliation_file(file_, affiliations, assignments):
             if affiliation == 0:
                 logger.warning(
                     'Project {} includes unknown assignment', project)
-                code = 'zz'
 
-            else:
-                code = affiliation_codes.get(affiliation)
-                if code is None:
-                    if affiliation in affiliations:
-                        affiliation = affiliations[affiliation].name
-                    logger.error('Unknown affiliation: {}', affiliation)
-                    sys.exit(1)
+            code = affiliation_codes.get(affiliation)
+            if code is None:
+                logger.error('Unknown affiliation: {}', affiliation)
+                sys.exit(1)
 
             lines.append((project, code, fraction))
 
