@@ -1,4 +1,4 @@
-# Copyright (C) 2015 East Asian Observatory
+# Copyright (C) 2015-2017 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -46,7 +46,9 @@ def write_project_ini(file_, telescope, semester, projects):
         config.add_section(code)
         config.set(code, 'country', project.country)
         config.set(code, 'pi', project.pi)
+        config.set(code, 'pi_affiliation', project.pi_affiliation)
         config.set(code, 'coi', ','.join(project.cois))
+        config.set(code, 'coi_affiliation', ','.join(project.coi_affiliation))
         config.set(code, 'title', re.sub('[^ -~]', '?', project.title))
         config.set(code, 'band', ','.join(str(x) for x in project.bands))
         config.set(code, 'allocation', str(project.allocation))

@@ -269,7 +269,9 @@ def main():
 
         # Process member list.
         pi = None
+        pi_affiliation = None
         cois = []
+        coi_affiliation = []
         member_pi = None
         member_cois = []
 
@@ -295,10 +297,18 @@ def main():
                         n_err += 1
                     continue
 
+                affiliation_code = affiliation_codes.get(member.affiliation_id)
+                if affiliation_code is None:
+                    logger.error('Unknown affiliation: {}', member.affiliation_id)
+                    n_err += 1
+                    continue
+
                 if is_pi:
                     pi = omp_id
+                    pi_affiliation = affiliation_code
                 else:
                     cois.append(omp_id)
+                    coi_affiliation.append(affiliation_code)
 
             if member_pi is None:
                 logger.error('No PI for project {}', code)
@@ -327,7 +337,9 @@ def main():
                 code=code,
                 country=country,
                 pi=pi,
+                pi_affiliation=pi_affiliation,
                 cois=cois,
+                coi_affiliation=coi_affiliation,
                 title=proposal.title,
                 bands=bands,
                 allocation=allocation_total.total,
