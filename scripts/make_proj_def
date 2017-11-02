@@ -223,6 +223,50 @@ def main():
             # Replace state enum value with a names.
             proposal_detail['state'] = ProposalState.get_name(proposal.state)
 
+        if ((args['--output'] is not None)
+                or (args['--output-affiliations'] is not None) or with_json):
+            # Fetch affiliation information from the database if we don't have
+            # it already.
+            if affiliations is None:
+                call_id = proposal.call_id
+                queue_id = proposal.queue_id
+                affiliations = db.search_affiliation(
+                    queue_id=queue_id, hidden=False,
+                    with_weight_call_id=call_id)
+
+                # Make lookup table for the JSON output.
+                affiliation_names[0] = 'Unknown'
+                for affiliation in affiliations.values():
+                    affiliation_names[affiliation.id] = affiliation.name
+
+                # Make lookup table for the affiliations and project files.
+                affiliation_codes[0] = 'zz'
+                for affiliation_code in config.options('affiliation_code'):
+                    affiliation_name = config.get(
+                        'affiliation_code', affiliation_code)
+                    for affiliation in affiliations.values():
+                        if affiliation.name == affiliation_name:
+                            affiliation_codes[affiliation.id] = \
+                                affiliation_code
+
+            elif ((call_id != proposal.call_id) or
+                    (queue_id != proposal.queue_id)):
+                logger.error('Call or queue mismatch')
+                sys.exit(1)
+
+            # Compute affiliation fractions.
+            proposal_assignment = facility.calculate_affiliation_assignment(
+                db, proposal.members, affiliations)
+
+            if (args['--include-exempt-affiliations']
+                    or not proposal.decision_exempt):
+                assignments[code] = proposal_assignment
+
+            if with_json:
+                proposal_detail['affiliation_assignment'] = {
+                    affiliation_names.get(k, 'Bad value'): v
+                    for (k, v) in proposal_assignment.items()}
+
         # Process member list.
         pi = None
         cois = []
@@ -317,50 +361,6 @@ def main():
                     reviews_technical[0]._replace(
                         review_assessment=Assessment.get_name(
                             reviews_technical[0].review_assessment)))
-
-        if ((args['--output'] is not None)
-                or (args['--output-affiliations'] is not None) or with_json):
-            # Fetch affiliation information from the database if we don't have
-            # it already.
-            if affiliations is None:
-                call_id = proposal.call_id
-                queue_id = proposal.queue_id
-                affiliations = db.search_affiliation(
-                    queue_id=queue_id, hidden=False,
-                    with_weight_call_id=call_id)
-
-                # Make lookup table for the JSON output.
-                affiliation_names[0] = 'Unknown'
-                for affiliation in affiliations.values():
-                    affiliation_names[affiliation.id] = affiliation.name
-
-                # Make lookup table for the affiliations and project files.
-                affiliation_codes[0] = 'zz'
-                for affiliation_code in config.options('affiliation_code'):
-                    affiliation_name = config.get(
-                        'affiliation_code', affiliation_code)
-                    for affiliation in affiliations.values():
-                        if affiliation.name == affiliation_name:
-                            affiliation_codes[affiliation.id] = \
-                                affiliation_code
-
-            elif ((call_id != proposal.call_id) or
-                    (queue_id != proposal.queue_id)):
-                logger.error('Call or queue mismatch')
-                sys.exit(1)
-
-            # Compute affiliation fractions.
-            proposal_assignment = facility.calculate_affiliation_assignment(
-                db, proposal.members, affiliations)
-
-            if (args['--include-exempt-affiliations']
-                    or not proposal.decision_exempt):
-                assignments[code] = proposal_assignment
-
-            if with_json:
-                proposal_detail['affiliation_assignment'] = {
-                    affiliation_names.get(k, 'Bad value'): v
-                    for (k, v) in proposal_assignment.items()}
 
         if (args['--output-targets'] is not None) or with_json:
             # Fetch target information from the database.
