@@ -30,7 +30,7 @@ class OMPDB(object):
 
         with self.db.db.transaction() as c:
             c.execute('SELECT u.email, u.userid'
-                      ' FROM omp..ompuser AS u'
+                      ' FROM omp.ompuser AS u'
                       ' WHERE u.obfuscated=0')
 
             while True:
