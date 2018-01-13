@@ -31,6 +31,7 @@ Usage:
         [--output-json <filename]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
+        [--skip-unknown-pis]
         [--state <state>]
         [--decision-accept]
     make_proj_def [-v | -q] --facility <facility> --project <project>
@@ -60,6 +61,7 @@ Options:
     --output-json <filename>          File to which to write proposal list as JSON
     --include-exempt-affiliations     Include affiliations for exempt proposals
     --skip-unknown-cois               Don't abort when CoIs not recognised
+    --skip-unknown-pis                Don't abort when PIs not recognised
     --state <state>                   Select proposals of given state [default: accepted]
     --decision-accept                 Select only proposals marked as being accepted
     --verbose, -v                     Increase verbosity
@@ -317,6 +319,15 @@ def main():
             if member_pi is None:
                 logger.error('No PI for project {}', code)
                 n_err += 1
+                continue
+            if pi is None:
+                if args['--skip-unknown-pis']:
+                    pi = ''
+                    pi_affiliation = ''
+                else:
+                    logger.error('PI is unknown Hedwig user')
+                    n_err += 1
+                    continue
 
             # Fetch allocation.
             if telescope == 'JCMT':
