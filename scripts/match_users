@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-# Copyright (C) 2015-2016 East Asian Observatory
+# Copyright (C) 2015-2018 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -21,7 +21,7 @@
 match_users - Attempt to match Hedwig users to OMP accounts
 
 Usage:
-    match_users [-v | -q] --semester <semester> --queue <queue> --type <type>
+    match_users [-v | -q] --facility <facility> --semester <semester> --queue <queue> --type <type>
         [--state <state>]
         [--skip-unregistered]
         [--decision-accept]
@@ -30,6 +30,7 @@ Usage:
 
 Options:
 
+    --facility <facility>    Facility code
     --semester <semester>    Semester code
     --queue <queue>          Queue code
     --type <type>            Call type code
@@ -63,7 +64,7 @@ from hedwig2omp.user import UserDB
 def main():
     args = docopt(__doc__)
 
-    telescope = 'JCMT'
+    telescope = args['--facility']
 
     logging.basicConfig(level=(logging.DEBUG if args['--verbose']
                                else (logging.WARNING if args['--quiet']
@@ -99,7 +100,8 @@ def main():
             sys.exit(1)
 
         try:
-            call_type = facility.get_call_types().by_code(args['--type'])
+            call_type = facility.get_call_types().by_code(
+                None if args['--type'] == 'NONE' else args['--type'])
         except NoSuchValue:
             logger.error('Type "{}" not recognised', args['--type'])
             sys.exit(1)

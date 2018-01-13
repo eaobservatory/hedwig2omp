@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-# Copyright (C) 2015-2017 East Asian Observatory
+# Copyright (C) 2015-2018 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -21,7 +21,7 @@
 make_proj_def - Export project definition file from Hedwig database
 
 Usage:
-    make_proj_def [-v | -q] --semester <semester> --queue <queue> --type <type>
+    make_proj_def [-v | -q] --facility <facility> --semester <semester> --queue <queue> --type <type>
         [--output <filename>]
         [--output-affiliations <filename>]
         [--output-targets <filename>]
@@ -33,7 +33,7 @@ Usage:
         [--skip-unknown-cois]
         [--state <state>]
         [--decision-accept]
-    make_proj_def [-v | -q] --project <project>
+    make_proj_def [-v | -q] --facility <facility> --project <project>
         [--output <filename>]
         [--output-affiliations <filename>]
         [--output-targets <filename>]
@@ -46,6 +46,7 @@ Usage:
 
 Options:
 
+    --facility <facility>             Facility code
     --semester <semester>             Semester code
     --queue <queue>                   Queue code
     --type <type>                     Call type code
@@ -96,7 +97,7 @@ from hedwig2omp.user import UserDB
 def main():
     args = docopt(__doc__)
 
-    telescope = 'JCMT'
+    telescope = args['--facility']
 
     logging.basicConfig(level=(logging.DEBUG if args['--verbose']
                                else (logging.WARNING if args['--quiet']
@@ -140,7 +141,8 @@ def main():
                 sys.exit(1)
 
         try:
-            call_type = facility.get_call_types().by_code(args['--type'])
+            call_type = facility.get_call_types().by_code(
+                None if args['--type'] == 'NONE' else args['--type'])
         except NoSuchValue:
             logger.error('Type "{}" not recognised', args['--type'])
             sys.exit(1)
@@ -193,10 +195,12 @@ def main():
 
     proposal_ids = [x.id for x in proposal_collection.values()]
     if (args['--output'] is not None) or with_json:
-        jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
+        if telescope == 'JCMT':
+            jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
     if with_json:
-        jcmt_requests = db.search_jcmt_request(proposal_id=proposal_ids)
-        jcmt_options = db.search_jcmt_options(proposal_id=proposal_ids)
+        if telescope == 'JCMT':
+            jcmt_requests = db.search_jcmt_request(proposal_id=proposal_ids)
+            jcmt_options = db.search_jcmt_options(proposal_id=proposal_ids)
     if (args['--output-targets'] is not None) or with_json:
         all_targets = db.search_target(proposal_id=proposal_ids)
     if (args['--output-publications'] is not None) or with_json:
@@ -315,18 +319,25 @@ def main():
                 n_err += 1
 
             # Fetch allocation.
-            allocation = jcmt_allocations.subset_by_proposal(proposal.id)
-            if not allocation:
-                if ((args['--output'] is not None)
-                        or (proposal.state == ProposalState.ACCEPTED)):
-                    logger.error('No allocation for project {}', code)
-                    n_err += 1
-                else:
-                    logger.warning('No allocation for project {}', code)
-            allocation_total = allocation.get_total()
-            bands = [
-                x for x in range(1, 6)
-                if allocation_total.weather.get(x, False)]
+            if telescope == 'JCMT':
+                allocation = jcmt_allocations.subset_by_proposal(proposal.id)
+                if not allocation:
+                    if ((args['--output'] is not None)
+                            or (proposal.state == ProposalState.ACCEPTED)):
+                        logger.error('No allocation for project {}', code)
+                        n_err += 1
+                    else:
+                        logger.warning('No allocation for project {}', code)
+                allocation_total = allocation.get_total()
+                bands = [
+                    x for x in range(1, 6)
+                    if allocation_total.weather.get(x, False)]
+            else:
+                allocation = None
+                from collections import namedtuple
+                DummyTotal = namedtuple('DummyTotal', ['total'])
+                allocation_total = DummyTotal(total=0.0)
+                bands = []
 
             # Compute priority, using formula suggested by IMC:
             #     OMP priority = 300 - 4 * (TAC_rating - 50)
@@ -357,14 +368,15 @@ def main():
                 proposal_detail['omp_bands'] = bands
                 proposal_detail['omp_priority'] = priority
                 proposal_detail['rating'] = rating
-                proposal_detail['request'] = \
-                    jcmt_requests.subset_by_proposal(proposal.id)
                 proposal_detail['allocation'] = allocation
-                proposal_detail['jcmt_options'] = \
-                    jcmt_options.subset_by_proposal(
-                        proposal.id).get_single(default=None)
                 proposal_detail['member_pi'] = member_pi
                 proposal_detail['member_cois'] = member_cois
+                if telescope == 'JCMT':
+                    proposal_detail['request'] = \
+                        jcmt_requests.subset_by_proposal(proposal.id)
+                    proposal_detail['jcmt_options'] = \
+                        jcmt_options.subset_by_proposal(
+                            proposal.id).get_single(default=None)
 
                 reviews_technical = proposal.reviewers.values_by_role(
                     role_class.TECH)
