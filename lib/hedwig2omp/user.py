@@ -19,14 +19,31 @@ from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
 from contextlib import closing
-import sqlite3
 
 from hedwig2omp.config import get_config
 
 
 class UserDB(object):
     def __init__(self):
-        self.db = sqlite3.connect(get_config().get('database', 'file'))
+        config = get_config()
+        driver = config.get('database', 'driver')
+
+        if driver == 'sqlite':
+            import sqlite3
+
+            self.db = sqlite3.connect(config.get('database', 'file'))
+
+        elif driver == 'mysql':
+            import mysql.connector
+
+            self.db = mysql.connector.connect(
+                host=config.get('database', 'host'),
+                database=config.get('database', 'database'),
+                user=config.get('database', 'user'),
+                password=config.get('database', 'password'))
+
+        else:
+            raise Exception('Unknown database type "{}"'.format(driver))
 
     def get_all_users(self):
         result = {}
