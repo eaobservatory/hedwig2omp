@@ -32,6 +32,7 @@ class UserDB(object):
             import sqlite3
 
             self.db = sqlite3.connect(config.get('database', 'file'))
+            paramstyle = sqlite3.paramstyle
 
         elif driver == 'mysql':
             import mysql.connector
@@ -41,9 +42,19 @@ class UserDB(object):
                 database=config.get('database', 'database'),
                 user=config.get('database', 'user'),
                 password=config.get('database', 'password'))
+            paramstyle = mysql.connector.paramstyle
 
         else:
             raise Exception('Unknown database type "{}"'.format(driver))
+
+        if paramstyle == 'qmark':
+            self.placeholder = '?'
+
+        elif paramstyle == 'pyformat':
+            self.placeholder = '%s'
+
+        else:
+            raise Exception('Unknown parameter style "{}"'.format(paramstyle))
 
     def get_all_users(self):
         result = {}
@@ -61,7 +72,9 @@ class UserDB(object):
 
     def add_user(self, hedwig_id, omp_id):
         with closing(self.db.cursor()) as c:
-            c.execute('INSERT INTO user (hedwig_id, omp_id) VALUES (?, ?)',
-                      (hedwig_id, omp_id))
+            c.execute(
+                'INSERT INTO user (hedwig_id, omp_id)'
+                ' VALUES ({0}, {0})'.format(self.placeholder),
+                (hedwig_id, omp_id))
 
         self.db.commit()
