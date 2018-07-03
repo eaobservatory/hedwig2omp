@@ -25,7 +25,7 @@ Usage:
         [--state <state>]
         [--skip-unregistered]
         [--decision-accept]
-    match_users [-v | -q] --project <project>
+    match_users [-v | -q] --facility <facility> --project <project>
         [--skip-unregistered]
 
 Options:
