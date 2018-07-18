@@ -132,6 +132,8 @@ def main():
         'with_categories': with_json,
     }
 
+    type_class = facility.get_call_types()
+
     if args['--project'] is None:
         if args['--state'].lower() == 'any':
             # Assume "any" means any submitted state.
@@ -143,7 +145,7 @@ def main():
                 sys.exit(1)
 
         try:
-            call_type = facility.get_call_types().by_code(
+            call_type = type_class.by_code(
                 None if args['--type'] == 'NONE' else args['--type'])
         except NoSuchValue:
             logger.error('Type "{}" not recognised', args['--type'])
@@ -171,6 +173,11 @@ def main():
         proposal = proposal_collection.get_single()
         semester_code = proposal.semester_code
         queue_code = proposal.queue_code
+        call_type = proposal.call_type
+
+    # Override the semester name if we are processing test proposals.
+    if call_type == type_class.TEST:
+        semester_code = 'TEST'
 
     logger.debug('Determining OMP country code')
     if config.has_option('queue_country', queue_code):
