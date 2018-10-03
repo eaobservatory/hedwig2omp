@@ -82,7 +82,7 @@ from docopt import docopt
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
-from hedwig.type.enum import Assessment, FormatType, ProposalState
+from hedwig.type.enum import Assessment, FormatType, ProposalState, ReviewState
 from hedwig.type.simple import ProposalText
 
 from hedwig2omp.config import get_config
@@ -127,6 +127,7 @@ def main():
         'with_reviewers': True,
         'with_review_info': True,
         'with_review_text': True,
+        'with_review_state': ReviewState.DONE,
         'with_decision': True,
         'with_decision_note': True,
         'with_categories': with_json,
