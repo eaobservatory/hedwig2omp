@@ -1,0 +1,60 @@
+#!/usr/bin/env python2
+
+# Copyright (C) 2020 East Asian Observatory
+# All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful,but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc.,51 Franklin
+# Street, Fifth Floor, Boston, MA  02110-1301, USA
+
+"""
+add_user - Add a specific user to the hedwig2omp user database
+
+Usage:
+    add_user [-v | -q] <hedwig_id> <omp_id>
+
+Options:
+
+    --verbose, -v            Increase verbosity
+    --quiet, -q              Decreate verbosity
+"""
+
+from __future__ import absolute_import, division, print_function, \
+    unicode_literals
+
+import logging
+
+from docopt import docopt
+
+from hedwig.util import get_logger
+
+from hedwig2omp.config import get_config
+from hedwig2omp.user import UserDB
+
+
+def main():
+    args = docopt(__doc__)
+
+    logging.basicConfig(level=(logging.DEBUG if args['--verbose']
+                               else (logging.WARNING if args['--quiet']
+                                     else logging.INFO)))
+
+    logger = get_logger('add_user')
+
+    user_db = UserDB()
+
+    user_db.add_user(int(args['<hedwig_id>']), args['<omp_id>'])
+
+
+if __name__ == '__main__':
+    main()
