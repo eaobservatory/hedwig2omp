@@ -72,7 +72,7 @@ from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
 from codecs import utf_8_decode
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from contextlib import contextmanager
 import logging
 import sys
@@ -83,7 +83,6 @@ from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
 from hedwig.type.enum import Assessment, FormatType, ProposalState, ReviewState
-from hedwig.type.simple import ProposalText
 
 from hedwig2omp.config import get_config
 from hedwig2omp.affiliation_file import write_affiliation_file
@@ -94,6 +93,8 @@ from hedwig2omp.project_list_json import write_json_file
 from hedwig2omp.target_file import write_target_file
 from hedwig2omp.type import Project
 from hedwig2omp.user import UserDB
+
+TextFormat = namedtuple('TextFormat', ['text', 'format'])
 
 
 def main():
@@ -416,18 +417,19 @@ def main():
                 proposal_detail['targets'] = proposal_targets
 
         if (args['--output-notes'] is not None) and proposal.decision_note:
-            notes[code] = ProposalText(text=proposal.decision_note,
-                                       format=proposal.decision_note_format)
+            notes[code] = TextFormat(
+                text=proposal.decision_note,
+                format=proposal.decision_note_format)
 
         if (args['--output-feedback'] is not None):
             feedback_reviews = proposal.reviewers.values_by_role(
                 role_class.FEEDBACK)
             if len(feedback_reviews) == 1:
-                feedback[code] = ProposalText(
+                feedback[code] = TextFormat(
                     text=feedback_reviews[0].review_text,
                     format=feedback_reviews[0].review_format)
             elif len(feedback_reviews) > 1:
-                feedback[code] = ProposalText(
+                feedback[code] = TextFormat(
                     text='Multiple feedback messages: please view online.',
                     format=FormatType.PLAIN)
 
