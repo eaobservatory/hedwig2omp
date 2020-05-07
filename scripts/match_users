@@ -25,6 +25,7 @@ Usage:
         [--state <state>]
         [--skip-unregistered]
         [--decision-accept]
+        [--search-inferred]
     match_users [-v | -q] --facility <facility> --project <project>
         [--skip-unregistered]
 
@@ -38,6 +39,7 @@ Options:
     --state <state>          Select proposals of given state [default: accepted]
     --skip-unregistered, -r  Skip unregistered proposal members
     --decision-accept        Select only proposals marked as being accepted
+    --search-inferred        Show matches for OMP-inferred name
     --verbose, -v            Increase verbosity
     --quiet, -q              Decreate verbosity
 """
@@ -78,6 +80,15 @@ def main():
     logger.debug('Reading users from the OMP')
     omp_user = {k.lower(): v
                 for (k, v) in OMPDB().get_users_by_email().items()}
+
+    taco_omp = None
+    omp_user_ids = None
+    if args['--search-inferred']:
+        from taco import Taco
+        taco_omp = Taco('perl')
+        taco_omp.import_module('JAC::Setup', 'omp')
+        taco_omp.import_module('OMP::User')
+        omp_user_ids = sorted(omp_user.values())
 
     logger.debug('Connecting to Hedwig database')
     db = get_database()
@@ -188,6 +199,15 @@ def main():
                     logger.info('No match found for: {} ({}: {})',
                                 person_id, member.person_name,
                                 ', '.join(addresses))
+
+                    if taco_omp is not None:
+                        omp_id_inferred = taco_omp.call_class_method(
+                            'OMP::User', 'infer_userid',
+                            ascii_encode(member.person_name, 'replace')[0])
+                        logger.info('OMP-inferred name: {}', omp_id_inferred)
+                        for omp_id_value in omp_user_ids:
+                            if omp_id_value.startswith(omp_id_inferred):
+                                logger.info('Possible match: {}', omp_id_value)
 
                     omp_id = raw_input(
                         'OMP ID for {}: '.format(
