@@ -32,6 +32,7 @@ Usage:
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
         [--skip-unknown-pis]
+        [--all-reviews]
         [--state <state>]
         [--decision-accept]
     make_proj_def [-v | -q] --facility <facility> --project <project>
@@ -64,6 +65,7 @@ Options:
     --skip-unknown-pis                Don't abort when PIs not recognised
     --state <state>                   Select proposals of given state [default: accepted]
     --decision-accept                 Select only proposals marked as being accepted
+    --all-reviews                     Export all reviews in JSON output
     --verbose, -v                     Increase verbosity
     --quiet, -q                       Decreate verbosity
 """
@@ -83,6 +85,8 @@ from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
 from hedwig.type.enum import Assessment, FormatType, ProposalState, ReviewState
+
+from hedwig.facility.jcmt.type import JCMTReviewerExpertise
 
 from hedwig2omp.config import get_config
 from hedwig2omp.affiliation_file import write_affiliation_file
@@ -400,13 +404,38 @@ def main():
                         jcmt_options.subset_by_proposal(
                             proposal.id).get_single(default=None)
 
-                reviews_technical = proposal.reviewers.values_by_role(
-                    role_class.TECH)
-                proposal_detail['review_technical'] = (
-                    None if (len(reviews_technical) != 1) else
-                    reviews_technical[0]._replace(
-                        review_assessment=Assessment.get_name(
-                            reviews_technical[0].review_assessment)))
+                roles = (role_class.get_options()
+                    if args['--all-reviews']
+                    else {role_class.TECH: 'Technical'})
+
+                for (role, role_name) in roles.items():
+                    role_name = role_name.lower().replace(' ', '_')
+
+                    reviews = []
+                    for review in proposal.reviewers.values_by_role(role):
+                        extra = review.review_extra
+
+                        if review.review_assessment is not None:
+                            review = review._replace(
+                                review_assessment=Assessment.get_name(
+                                    review.review_assessment))
+
+                        if extra is not None:
+                            if extra.expertise is not None:
+                                extra = extra._replace(
+                                    expertise=JCMTReviewerExpertise.get_name(extra.expertise))
+
+                        reviews.append(review._replace(
+                            role=role_class.get_name(review.role),
+                            review_state=ReviewState.get_name(review.review_state),
+                            review_extra=extra))
+
+                    if role_class.get_info(role).unique:
+                        proposal_detail['review_{}'.format(role_name)] = (
+                            None if (len(reviews) != 1) else
+                            reviews[0])
+                    else:
+                        proposal_detail['review_{}'.format(role_name)] = reviews
 
         if (args['--output-targets'] is not None) or with_json:
             # Fetch target information from the database.
