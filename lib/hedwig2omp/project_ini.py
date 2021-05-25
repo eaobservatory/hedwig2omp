@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017 East Asian Observatory
+# Copyright (C) 2015-2021 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -53,6 +53,14 @@ def write_project_ini(file_, telescope, semester, projects):
         config.set(code, 'band', ','.join(str(x) for x in project.bands))
         config.set(code, 'allocation', str(project.allocation))
         config.set(code, 'tagpriority', str(project.tagpriority))
+
+        if project.tagadjustment is not None:
+            config.set(code, 'tagadjustment', str(project.tagadjustment))
+
         config.set(code, 'support', project.support)
+
+        if project.expiry is not None:
+            config.set(
+                code, 'expiry', project.expiry.strftime('%Y-%m-%dT%H:%M:%S'))
 
     config.write(file_)

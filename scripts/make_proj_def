@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-# Copyright (C) 2015-2018 East Asian Observatory
+# Copyright (C) 2015-2021 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -76,6 +76,7 @@ from __future__ import absolute_import, division, print_function, \
 from codecs import utf_8_decode
 from collections import OrderedDict, namedtuple
 from contextlib import contextmanager
+from datetime import datetime
 import logging
 import sys
 
@@ -369,6 +370,16 @@ def main():
                 proposal.reviewers, with_std_dev=True)
             priority = 600 if rating is None else int(500.0 - (4.0 * rating))
 
+            expiry = None
+            if (call_type == type_class.MULTICLOSE):
+                dt_now = datetime.utcnow()
+                expiry_year = dt_now.year
+                expiry_month = dt_now.month + 7
+                if expiry_month > 12:
+                    expiry_month -= 12
+                    expiry_year += 1
+                expiry = datetime(expiry_year, expiry_month, 2)
+
             proposals.append(Project(
                 code=code,
                 country=country,
@@ -380,7 +391,9 @@ def main():
                 bands=bands,
                 allocation=allocation_total.total,
                 tagpriority=priority,
-                support=''))
+                tagadjustment=None,
+                support='',
+                expiry=expiry))
 
             if with_json:
                 del proposal_detail['member']
