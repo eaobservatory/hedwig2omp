@@ -218,10 +218,10 @@ def main():
     if (args['--output'] is not None) or with_json:
         if telescope == 'JCMT':
             jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
+            jcmt_options = db.search_jcmt_options(proposal_id=proposal_ids)
     if with_json:
         if telescope == 'JCMT':
             jcmt_requests = db.search_jcmt_request(proposal_id=proposal_ids)
-            jcmt_options = db.search_jcmt_options(proposal_id=proposal_ids)
     if (args['--output-targets'] is not None) or with_json:
         all_targets = db.search_target(proposal_id=proposal_ids)
     if (args['--output-publications'] is not None) or with_json:
@@ -370,18 +370,27 @@ def main():
                 bands = [
                     x for x in range(1, 6)
                     if allocation_total.weather.get(x, False)]
+
+                options = jcmt_options.subset_by_proposal(
+                    proposal.id).get_single(default=None)
+
             else:
                 allocation = None
                 from collections import namedtuple
                 DummyTotal = namedtuple('DummyTotal', ['total'])
                 allocation_total = DummyTotal(total=0.0)
                 bands = []
+                options = None
 
-            # Compute priority, using formula suggested by IMC:
-            #     OMP priority = 300 - 4 * (TAC_rating - 50)
             (rating, rating_std_dev) = facility.calculate_overall_rating(
                 proposal.reviewers, with_std_dev=True)
-            priority = 600 if rating is None else int(500.0 - (4.0 * rating))
+
+            if ((options is not None) and options.target_of_opp):
+                priority = -10
+            else:
+                # Compute priority, using formula suggested by IMC:
+                #     OMP priority = 300 - 4 * (TAC_rating - 50)
+                priority = 600 if rating is None else int(500.0 - (4.0 * rating))
 
             expiry = None
             if (call_type == type_class.MULTICLOSE):
