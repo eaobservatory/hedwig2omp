@@ -45,6 +45,7 @@ Usage:
         [--output-json <filename]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
+        [--dummy-allocation]
 
 Options:
 
@@ -66,6 +67,7 @@ Options:
     --state <state>                   Select proposals of given state [default: accepted]
     --decision-accept                 Select only proposals marked as being accepted
     --all-reviews                     Export all reviews in JSON output
+    --dummy-allocation                If the allocation is missing, use a dummy value
     --verbose, -v                     Increase verbosity
     --quiet, -q                       Decreate verbosity
 """
@@ -86,8 +88,11 @@ from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
 from hedwig.type.enum import Assessment, FormatType, ProposalState, ReviewState
+from hedwig.type.util import null_tuple
 
-from hedwig.facility.jcmt.type import JCMTReviewerExpertise
+from hedwig.facility.jcmt.type import \
+    JCMTInstrument, JCMTRequestCollection, JCMTRequest, \
+    JCMTReviewerExpertise, JCMTWeather
 
 from hedwig2omp.config import get_config
 from hedwig2omp.affiliation_file import write_affiliation_file
@@ -349,8 +354,16 @@ def main():
                 if not allocation:
                     if ((args['--output'] is not None)
                             or (proposal.state == ProposalState.ACCEPTED)):
-                        logger.error('No allocation for project {}', code)
-                        n_err += 1
+                        if args['--dummy-allocation']:
+                            logger.warning('Using dummy allocation for project {}', code)
+                            allocation = JCMTRequestCollection(((
+                                1, null_tuple(JCMTRequest)._replace(
+                                    weather=JCMTWeather.BAND5,
+                                    instrument=JCMTInstrument.SCUBA2,
+                                    time=1)),))
+                        else:
+                            logger.error('No allocation for project {}', code)
+                            n_err += 1
                     else:
                         logger.warning('No allocation for project {}', code)
                 allocation_total = allocation.get_total()
