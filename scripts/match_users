@@ -50,6 +50,7 @@ from __future__ import absolute_import, division, print_function, \
 from codecs import ascii_encode, utf_8_decode
 import logging
 import sys
+import unicodedata
 
 from docopt import docopt
 
@@ -201,9 +202,12 @@ def main():
                                 ', '.join(addresses))
 
                     if taco_omp is not None:
+                        # The OMP removes accented characters, so decompose
+                        # to remove accents and then encode with ignore to remove.
+                        person_name = unicodedata.normalize('NFKD', member.person_name)
+                        person_name = ascii_encode(person_name, 'ignore')[0]
                         omp_id_inferred = taco_omp.call_class_method(
-                            'OMP::User', 'infer_userid',
-                            ascii_encode(member.person_name, 'replace')[0])
+                            'OMP::User', 'infer_userid', person_name)
                         logger.info('OMP-inferred name: {}', omp_id_inferred)
                         for omp_id_value in omp_user_ids:
                             if omp_id_value.startswith(omp_id_inferred):
