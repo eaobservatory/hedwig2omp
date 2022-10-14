@@ -79,8 +79,8 @@ def main():
     users = user_db.get_all_users()
 
     logger.debug('Reading users from the OMP')
-    omp_user = {k.lower(): v
-                for (k, v) in OMPDB().get_users_by_email().items()}
+    omp_users_by_email = OMPDB().get_users_by_email()
+    omp_user = {k.lower(): v.id for (k, v) in omp_users_by_email.items()}
 
     taco_omp = None
     omp_user_ids = None
@@ -89,7 +89,7 @@ def main():
         taco_omp = Taco('perl')
         taco_omp.import_module('JAC::Setup', 'omp')
         taco_omp.import_module('OMP::User')
-        omp_user_ids = sorted(omp_user.values())
+        omp_user_ids = sorted(omp_users_by_email.values())
 
     logger.debug('Connecting to Hedwig database')
     db = get_database()
@@ -210,8 +210,10 @@ def main():
                             'OMP::User', 'infer_userid', person_name)
                         logger.info('OMP-inferred name: {}', omp_id_inferred)
                         for omp_id_value in omp_user_ids:
-                            if omp_id_value.startswith(omp_id_inferred):
-                                logger.info('Possible match: {}', omp_id_value)
+                            if omp_id_value.id.startswith(omp_id_inferred):
+                                logger.info(
+                                    'Possible match: {} ({})',
+                                    omp_id_value.id, omp_id_value.name)
 
                     omp_id = raw_input(
                         'OMP ID for {}: '.format(

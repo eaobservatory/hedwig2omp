@@ -18,7 +18,12 @@
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
+from collections import namedtuple
+
 from omp.db.part.arc import ArcDB
+
+
+OMPUser = namedtuple('OMPUser', ('id', 'name'))
 
 
 class OMPDB(object):
@@ -29,7 +34,7 @@ class OMPDB(object):
         result = {}
 
         with self.db.db.transaction() as c:
-            c.execute('SELECT u.email, u.userid'
+            c.execute('SELECT u.email, u.userid, u.uname'
                       ' FROM omp.ompuser AS u'
                       ' WHERE u.obfuscated=0')
 
@@ -41,6 +46,6 @@ class OMPDB(object):
                 if row[0] is None:
                     continue
 
-                result[row[0]] = row[1]
+                result[row[0]] = OMPUser(row[1], row[2])
 
         return result
