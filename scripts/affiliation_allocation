@@ -41,6 +41,7 @@ import sys
 
 from docopt import docopt
 
+from hedwig.compat import first_value
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
@@ -64,9 +65,8 @@ def main():
 
     logger.debug('Connecting to Hedwig database')
     db = get_database()
-    (facility_class,) = get_facilities(facility_spec=telescope)
-    facility_id = db.ensure_facility(facility_class.get_code())
-    facility = facility_class(facility_id)
+    facility_info = first_value(get_facilities(facility_spec=telescope))
+    facility = facility_info.view
 
     try:
         call_type = facility.get_call_types().by_code(args['--type'])
@@ -79,7 +79,7 @@ def main():
 
     logger.debug('Finding call')
     call = db.search_call(
-        facility_id=facility_id, type_=call_type,
+        facility_id=facility_info.id, type_=call_type,
         queue_code=queue_code, semester_code=semester_code).get_single()
 
     # Replicate logic from hedwig.facility.jcmt.view._get_proposal_tabulation.

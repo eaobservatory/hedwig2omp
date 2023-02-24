@@ -42,6 +42,7 @@ import sys
 
 from docopt import docopt
 
+from hedwig.compat import first_value
 from hedwig.config import get_database, get_facilities
 from hedwig.file.csv import CSVWriter
 from hedwig.util import get_logger
@@ -68,9 +69,8 @@ def main():
 
     logger.debug('Connecting to Hedwig database')
     db = get_database()
-    (facility_class,) = get_facilities(facility_spec=telescope)
-    facility_id = db.ensure_facility(facility_class.get_code())
-    facility = facility_class(facility_id)
+    facility_info = first_value(get_facilities(facility_spec=telescope))
+    facility = facility_info.view
 
     if config.has_option('queue_country', queue_code):
         country = config.get('queue_country', queue_code)
@@ -83,7 +83,7 @@ def main():
         affiliation_name = affiliation_code
 
     logger.debug('Looking up queue ID')
-    for queue in db.search_queue(facility_id=facility_id).values():
+    for queue in db.search_queue(facility_id=facility_info.id).values():
         if queue.code == queue_code:
             queue_id = queue.id
             break
@@ -110,7 +110,7 @@ def main():
     proposals = []
 
     for proposal in db.search_proposal(
-            facility_id=facility_id,
+            facility_id=facility_info.id,
             semester_code=semester_code,
             queue_code=queue_code,
             state=(ProposalState.REVIEW,

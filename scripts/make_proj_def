@@ -84,6 +84,7 @@ import sys
 
 from docopt import docopt
 
+from hedwig.compat import first_value
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
@@ -125,14 +126,13 @@ def main():
 
     logger.debug('Connecting to Hedwig database')
     db = get_database()
-    (facility_class,) = get_facilities(facility_spec=telescope)
-    facility_id = db.ensure_facility(facility_class.get_code())
-    facility = facility_class(facility_id)
+    facility_info = first_value(get_facilities(facility_spec=telescope))
+    facility = facility_info.view
 
     with_json = (args['--output-json'] is not None)
 
     query_kwargs = {
-        'facility_id': facility_id,
+        'facility_id': facility_info.id,
         'decision_accept': (True if args['--decision-accept'] else None),
         'with_members': True,
         'with_reviewers': True,
