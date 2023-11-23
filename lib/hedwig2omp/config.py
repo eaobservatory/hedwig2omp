@@ -18,7 +18,11 @@
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
-from ConfigParser import SafeConfigParser
+try:
+    from configparser import ConfigParser
+except:
+    from ConfigParser import SafeConfigParser as ConfigParser
+
 import os
 
 
@@ -31,7 +35,7 @@ def get_config():
     if config is None:
         dir_ = os.environ.get('HEDWIG2OMP_DIR', os.getcwd())
         file_ = os.path.join(dir_, 'etc', 'hedwig2omp.ini')
-        config = SafeConfigParser()
+        config = ConfigParser()
         config.read(file_)
 
     return config

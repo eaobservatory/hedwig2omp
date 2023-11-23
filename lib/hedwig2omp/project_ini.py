@@ -19,7 +19,10 @@ from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
 import re
-from ConfigParser import SafeConfigParser
+try:
+    from configparser import ConfigParser
+except:
+    from ConfigParser import SafeConfigParser as ConfigParser
 
 
 def write_project_ini(file_, telescope, semester, projects):
@@ -35,7 +38,7 @@ def write_project_ini(file_, telescope, semester, projects):
     `projects` should be a list of `Project` namedtuples.
     """
 
-    config = SafeConfigParser()
+    config = ConfigParser()
 
     config.add_section('info')
     config.set('info', 'semester', semester)
