@@ -35,6 +35,7 @@ Usage:
         [--all-reviews]
         [--state <state>]
         [--decision-accept]
+        [--dummy-allocation]
     make_proj_def [-v | -q] --facility <facility> --project <project>
         [--output <filename>]
         [--output-affiliations <filename>]
@@ -45,6 +46,7 @@ Usage:
         [--output-json <filename]
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
+        [--skip-unknown-pis]
         [--dummy-allocation]
 
 Options:
