@@ -75,7 +75,6 @@ Options:
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
-from codecs import utf_8_decode
 from codecs import open as open_
 from collections import OrderedDict, namedtuple
 from contextlib import contextmanager
@@ -85,7 +84,7 @@ import sys
 
 from docopt import docopt
 
-from hedwig.compat import first_value
+from hedwig.compat import first_value, str_to_unicode
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
@@ -164,8 +163,8 @@ def main():
             logger.error('Type "{}" not recognised', args['--type'])
             sys.exit(1)
 
-        semester_code = utf_8_decode(args['--semester'])[0]
-        queue_code = utf_8_decode(args['--queue'])[0]
+        semester_code = str_to_unicode(args['--semester'])
+        queue_code = str_to_unicode(args['--queue'])
 
         logger.debug('Finding proposals for this call')
         proposal_collection = db.search_proposal(
@@ -178,7 +177,7 @@ def main():
     else:
         logger.debug('Searching for specific proposal by identifier')
 
-        project_code = utf_8_decode(args['--project'])[0]
+        project_code = str_to_unicode(args['--project'])
         proposal_collection = db.search_proposal(
             proposal_id=facility.parse_proposal_code(db, project_code),
             **query_kwargs)

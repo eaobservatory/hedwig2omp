@@ -35,14 +35,13 @@ Options:
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
-from codecs import utf_8_decode
 from collections import OrderedDict
 import logging
 import sys
 
 from docopt import docopt
 
-from hedwig.compat import first_value
+from hedwig.compat import first_value, str_to_unicode
 from hedwig.config import get_database, get_facilities
 from hedwig.file.csv import CSVWriter
 from hedwig.util import get_logger
@@ -55,9 +54,9 @@ def main():
     args = docopt(__doc__)
 
     telescope = 'JCMT'
-    semester_code = utf_8_decode(args['--semester'])[0]
-    queue_code = utf_8_decode(args['--queue'])[0]
-    affiliation_code = utf_8_decode(args['--affiliation'])[0]
+    semester_code = str_to_unicode(args['--semester'])
+    queue_code = str_to_unicode(args['--queue'])
+    affiliation_code = str_to_unicode(args['--affiliation'])
 
     logging.basicConfig(level=(logging.DEBUG if args['--verbose']
                                else (logging.WARNING if args['--quiet']
