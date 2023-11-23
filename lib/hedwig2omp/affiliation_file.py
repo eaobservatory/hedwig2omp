@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2016 East Asian Observatory
+# Copyright (C) 2015-2023 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -41,6 +41,12 @@ def write_affiliation_file(file_, affiliation_codes, assignments):
             if code is None:
                 logger.error('Unknown affiliation: {}', affiliation)
                 sys.exit(1)
+
+            if fraction == 0.0:
+                logger.warning(
+                    'Project {} includes zero assignment for {}',
+                    project, code)
+                continue
 
             lines.append((project, code, fraction))
 
