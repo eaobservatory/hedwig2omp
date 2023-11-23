@@ -47,14 +47,12 @@ Options:
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
-from codecs import ascii_encode
 import logging
 import sys
-import unicodedata
 
 from docopt import docopt
 
-from hedwig.compat import first_value, str_to_unicode
+from hedwig.compat import first_value, python_version, str_to_unicode
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
@@ -63,6 +61,10 @@ from hedwig.type.enum import ProposalState
 from hedwig2omp.config import get_config
 from hedwig2omp.omp import OMPDB
 from hedwig2omp.user import UserDB
+
+if not python_version < 3:
+    def raw_input(*args):
+        return input(*args)
 
 
 def main():
@@ -169,7 +171,7 @@ def main():
                 response = raw_input(
                     'Store OMP ID {} for {} [y/N]: '.format(
                         omp_id,
-                        ascii_encode(member.person_name, 'replace')[0]))
+                        member.person_name))
                 if response.upper().startswith('Y'):
                     user_db.add_user(person_id, omp_id)
                     break
@@ -193,7 +195,7 @@ def main():
                     response = raw_input(
                         'Store OMP ID {} for {} [y/N]: '.format(
                             omp_id,
-                            ascii_encode(member.person_name, 'replace')[0]))
+                            member.person_name))
                     if response.upper().startswith('Y'):
                         user_db.add_user(person_id, omp_id)
                         break
@@ -206,10 +208,8 @@ def main():
                     if taco_omp is not None:
                         # The OMP removes accented characters, so decompose
                         # to remove accents and then encode with ignore to remove.
-                        person_name = unicodedata.normalize('NFKD', member.person_name)
-                        person_name = ascii_encode(person_name, 'ignore')[0]
                         omp_id_inferred = taco_omp.call_class_method(
-                            'OMP::User', 'infer_userid', person_name)
+                            'OMP::User', 'infer_userid', member.person_name)
                         logger.info('OMP-inferred name: {}', omp_id_inferred)
                         for omp_id_value in omp_user_ids:
                             if omp_id_value.id.startswith(omp_id_inferred):
@@ -219,7 +219,7 @@ def main():
 
                     omp_id = raw_input(
                         'OMP ID for {}: '.format(
-                            ascii_encode(member.person_name, 'replace')[0]))
+                            member.person_name))
                     if omp_id:
                         if len(omp_id) < 3:
                             logger.warning(
