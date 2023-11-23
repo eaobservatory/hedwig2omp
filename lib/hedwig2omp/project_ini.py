@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2021 East Asian Observatory
+# Copyright (C) 2015-2023 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -18,7 +18,6 @@
 from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
-import re
 try:
     from configparser import ConfigParser
 except:
@@ -52,7 +51,7 @@ def write_project_ini(file_, telescope, semester, projects):
         config.set(code, 'pi_affiliation', project.pi_affiliation)
         config.set(code, 'coi', ','.join(project.cois))
         config.set(code, 'coi_affiliation', ','.join(project.coi_affiliation))
-        config.set(code, 'title', re.sub('[^ -~]', '?', project.title))
+        config.set(code, 'title', project.title)
         config.set(code, 'band', ','.join(str(x) for x in project.bands))
         config.set(code, 'allocation', str(project.allocation))
         config.set(code, 'tagpriority', str(project.tagpriority))

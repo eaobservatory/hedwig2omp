@@ -1,6 +1,6 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
-# Copyright (C) 2015-2021 East Asian Observatory
+# Copyright (C) 2015-2023 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -76,6 +76,7 @@ from __future__ import absolute_import, division, print_function, \
     unicode_literals
 
 from codecs import utf_8_decode
+from codecs import open as open_
 from collections import OrderedDict, namedtuple
 from contextlib import contextmanager
 from datetime import datetime
@@ -551,7 +552,7 @@ def file_or_stdout(filename, mode='w'):
         yield sys.stdout
 
     else:
-        with open(filename, mode) as file_:
+        with open_(filename, mode, encoding='utf-8') as file_:
             yield file_
 
 
