@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+
+# Copyright (C) 2016-2023 East Asian Observatory
+# All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation; either version 2 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful,but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, write to the Free Software Foundation, Inc.,51 Franklin
+# Street, Fifth Floor, Boston, MA  02110-1301, USA
+
+"""
+export_pdf - Export proposal or review PDF files
+
+Usage:
+    export_pdf [-v | -q] --facility <facility> --semester <semester> --queue <queue> --type <type>
+        [--review]
+        [--output <directory>]
+    export_pdf [-v | -q] --facility <facility> --project <project>
+        [--review]
+        [--output <directory>]
+
+Options:
+    --facility <facility>             Facility code
+    --semester <semester>             Semester code
+    --queue <queue>                   Queue code
+    --type <type>                     Call type code
+    --project <project>               Specific project identifier
+    --output, -o <directory>          Output directory
+    --verbose, -v                     Increase verbosity
+    --quiet, -q                       Decreate verbosity
+    --review                          Generate review PDF instead of proposal
+"""
+
+from __future__ import absolute_import, division, print_function, \
+    unicode_literals
+
+import logging
+import os
+
+from docopt import docopt
+
+from hedwig.compat import first_value
+from hedwig.config import get_database, get_facilities, get_pdf_writer
+from hedwig.type.enum import ProposalState
+from hedwig.util import get_logger
+
+
+def main():
+    args = docopt(__doc__)
+
+    logging.basicConfig(level=(
+        logging.DEBUG if args['--verbose'] else (
+            logging.WARNING if args['--quiet'] else logging.INFO)))
+
+    logger = get_logger('export_pdf')
+
+    pdf_writer = get_pdf_writer()
+
+    db = get_database()
+    facility_info = first_value(get_facilities(facility_spec=args['--facility']))
+    facility = facility_info.view
+
+    query_kwargs = {
+        'facility_id': facility_info.id,
+    }
+
+    if args['--project'] is None:
+        try:
+            call_type = facility.get_call_types().by_code(
+                None if args['--type'] == 'NONE' else args['--type'])
+        except NoSuchValue:
+            logger.error('Type "{}" not recognised', args['--type'])
+            sys.exit(1)
+
+        semester_code = args['--semester']
+        queue_code = args['--queue']
+
+        logger.debug('Finding proposals for this call')
+        proposal_collection = db.search_proposal(
+            call_type=call_type,
+            semester_code=semester_code,
+            queue_code=queue_code,
+            state=ProposalState.submitted_states(),
+            **query_kwargs)
+
+    else:
+        logger.debug('Searching for specific proposal by identifier')
+
+        project_code = args['--project']
+        proposal_collection = db.search_proposal(
+            proposal_id=facility.parse_proposal_code(db, project_code),
+            **query_kwargs)
+
+    output_dir = args['--output']
+
+    for proposal in proposal_collection.values():
+        code = facility.make_proposal_code(db, proposal)
+
+        if args['--review']:
+            logger.info('Preparing PDF for reviews of proposal {}', code)
+
+            pdf = pdf_writer.reviews(proposal.id)
+
+        else:
+            logger.info('Preparing PDF for proposal {}', code)
+
+            pdf = pdf_writer.proposal(proposal.id)
+
+        filename = '{}.pdf'.format(code.replace('/', '').lower())
+
+        with open(os.path.join(output_dir, filename), 'wb') as f:
+            f.write(pdf)
+
+
+if __name__ == '__main__':
+    main()
