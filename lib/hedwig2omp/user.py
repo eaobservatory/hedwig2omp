@@ -1,4 +1,4 @@
-# Copyright (C) 2015 East Asian Observatory
+# Copyright (C) 2015-2024 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -20,47 +20,26 @@ from __future__ import absolute_import, division, print_function, \
 
 from contextlib import closing
 
-from hedwig2omp.config import get_config
+from omp.db.db import OMPDB
+from omp.siteconfig import get_omp_siteconfig
 
 
 class UserDB(object):
     def __init__(self):
-        config = get_config()
-        driver = config.get('database', 'driver')
+        cfg = get_omp_siteconfig()
 
-        if driver == 'sqlite':
-            import sqlite3
+        self.db = OMPDB(
+            server=cfg.get('database', 'server'),
+            user=cfg.get('database', 'user'),
+            password=cfg.get('database', 'password'))
 
-            self.db = sqlite3.connect(config.get('database', 'file'))
-            paramstyle = sqlite3.paramstyle
-
-        elif driver == 'mysql':
-            import mysql.connector
-
-            self.db = mysql.connector.connect(
-                host=config.get('database', 'host'),
-                database=config.get('database', 'database'),
-                user=config.get('database', 'user'),
-                password=config.get('database', 'password'))
-            paramstyle = mysql.connector.paramstyle
-
-        else:
-            raise Exception('Unknown database type "{}"'.format(driver))
-
-        if paramstyle == 'qmark':
-            self.placeholder = '?'
-
-        elif paramstyle == 'pyformat':
-            self.placeholder = '%s'
-
-        else:
-            raise Exception('Unknown parameter style "{}"'.format(paramstyle))
+        self.placeholder = '%s'
 
     def get_all_users(self):
         result = {}
 
-        with closing(self.db.cursor()) as c:
-            c.execute('SELECT hedwig_id, omp_id FROM user')
+        with self.db.db.transaction() as c:
+            c.execute('SELECT hedwig_id, omp_id FROM omp.omphedwiguser')
             while True:
                 row = c.fetchone()
                 if row is None:
@@ -71,10 +50,8 @@ class UserDB(object):
         return result
 
     def add_user(self, hedwig_id, omp_id):
-        with closing(self.db.cursor()) as c:
+        with self.db.db.transaction(read_write=True) as c:
             c.execute(
-                'INSERT INTO user (hedwig_id, omp_id)'
+                'INSERT INTO omp.omphedwiguser (hedwig_id, omp_id)'
                 ' VALUES ({0}, {0})'.format(self.placeholder),
                 (hedwig_id, omp_id))
-
-        self.db.commit()

@@ -1,13 +1,3 @@
-[database]
-driver=
-# For driver=sqlite
-#file=
-# For driver=mysql
-#host=
-#database=
-#user=
-#password=
-
 [queue_country]
 P=PI
 
