@@ -227,7 +227,8 @@ def main():
             or with_json):
         if telescope == 'JCMT':
             jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
-            jcmt_options = db.search_jcmt_options(proposal_id=proposal_ids)
+            jcmt_request_options = db.search_jcmt_options(proposal_id=proposal_ids)
+            jcmt_alloc_options = db.search_jcmt_alloc_options(proposal_id=proposal_ids)
     if with_json:
         if telescope == 'JCMT':
             jcmt_requests = db.search_jcmt_request(proposal_id=proposal_ids)
@@ -422,7 +423,7 @@ def main():
                     x for x in range(1, 6)
                     if allocation_total.weather.get(x, False)]
 
-                options = jcmt_options.subset_by_proposal(
+                options = jcmt_alloc_options.subset_by_proposal(
                     proposal.id).get_single(default=None)
 
             else:
@@ -497,8 +498,11 @@ def main():
                 if telescope == 'JCMT':
                     proposal_detail['request'] = \
                         jcmt_requests.subset_by_proposal(proposal.id)
+                    proposal_detail['jcmt_options_request'] = \
+                        jcmt_request_options.subset_by_proposal(
+                            proposal.id).get_single(default=None)
                     proposal_detail['jcmt_options'] = \
-                        jcmt_options.subset_by_proposal(
+                        jcmt_alloc_options.subset_by_proposal(
                             proposal.id).get_single(default=None)
 
                 roles = (role_class.get_options()
