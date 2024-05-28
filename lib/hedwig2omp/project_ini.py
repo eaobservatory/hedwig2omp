@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2023 East Asian Observatory
+# Copyright (C) 2015-2024 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -46,12 +46,23 @@ def write_project_ini(file_, telescope, semester, projects):
     for project in projects:
         code = project.code
         config.add_section(code)
-        config.set(code, 'country', project.country)
-        config.set(code, 'pi', project.pi)
-        config.set(code, 'pi_affiliation', project.pi_affiliation)
-        config.set(code, 'coi', ','.join(project.cois))
-        config.set(code, 'coi_affiliation', ','.join(project.coi_affiliation))
-        config.set(code, 'title', project.title)
+        if project.continuation is not None:
+            config.set(code, 'continuation', project.continuation)
+
+        if project.country is not None:
+            config.set(code, 'country', project.country)
+
+        if project.pi is not None:
+            config.set(code, 'pi', project.pi)
+            config.set(code, 'pi_affiliation', project.pi_affiliation)
+
+        if project.cois is not None:
+            config.set(code, 'coi', ','.join(project.cois))
+            config.set(code, 'coi_affiliation', ','.join(project.coi_affiliation))
+
+        if project.title is not None:
+            config.set(code, 'title', project.title)
+
         config.set(code, 'band', ','.join(str(x) for x in project.bands))
         config.set(code, 'allocation', str(project.allocation))
         config.set(code, 'tagpriority', str(project.tagpriority))
@@ -59,7 +70,8 @@ def write_project_ini(file_, telescope, semester, projects):
         if project.tagadjustment is not None:
             config.set(code, 'tagadjustment', str(project.tagadjustment))
 
-        config.set(code, 'support', project.support)
+        if project.support is not None:
+            config.set(code, 'support', project.support)
 
         if project.expiry is not None:
             config.set(

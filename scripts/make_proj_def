@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2015-2023 East Asian Observatory
+# Copyright (C) 2015-2024 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -23,6 +23,7 @@ make_proj_def - Export project definition file from Hedwig database
 Usage:
     make_proj_def [-v | -q] --facility <facility> --semester <semester> --queue <queue> --type <type>
         [--output <filename>]
+        [--output-continuation <filename>]
         [--output-affiliations <filename>]
         [--output-targets <filename>]
         [--output-notes <filename>]
@@ -38,6 +39,7 @@ Usage:
         [--dummy-allocation]
     make_proj_def [-v | -q] --facility <facility> --project <project>
         [--output <filename>]
+        [--output-continuation <filename>]
         [--output-affiliations <filename>]
         [--output-targets <filename>]
         [--output-notes <filename>]
@@ -57,6 +59,7 @@ Options:
     --type <type>                     Call type code
     --project <project>               Specific project identifier
     --output, -o <filename>           Output filename
+    --output-continuation <filename>  File to which to write continuation requests
     --output-affiliations <filename>  File to which to write affiliations
     --output-targets <filename>       File to which to write targets
     --output-notes <filename>         File to which to write TAC notes
@@ -90,7 +93,8 @@ from hedwig.compat import first_value, str_to_unicode
 from hedwig.config import get_database, get_facilities
 from hedwig.error import NoSuchValue
 from hedwig.util import get_logger
-from hedwig.type.enum import Assessment, FormatType, ProposalState, ReviewState
+from hedwig.type.enum import Assessment, FormatType, \
+    ProposalState, ProposalType, ReviewState
 from hedwig.type.util import null_tuple
 
 from hedwig.facility.jcmt.type import \
@@ -201,6 +205,7 @@ def main():
 
     proposals = []
     proposal_details = {}
+    continuation_proposals = []
     n_err = 0
     call_id = None
     queue_id = None
@@ -217,7 +222,9 @@ def main():
     facility.attach_review_extra(db, proposal_collection)
 
     proposal_ids = [x.id for x in proposal_collection.values()]
-    if (args['--output'] is not None) or with_json:
+    if ((args['--output'] is not None)
+            or (args['--output-continuation'] is not None)
+            or with_json):
         if telescope == 'JCMT':
             jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
             jcmt_options = db.search_jcmt_options(proposal_id=proposal_ids)
@@ -229,6 +236,7 @@ def main():
     if (args['--output-publications'] is not None) or with_json:
         all_prev_proposals = db.search_prev_proposal(proposal_id=proposal_ids)
 
+    proposal_ids_cr = set()
     for proposal in proposal_collection.values():
         to_delete = []
         for member in proposal.members.values():
@@ -239,18 +247,55 @@ def main():
         for member_id in to_delete:
             del proposal.members[member_id]
 
+        if proposal.type == ProposalType.CONTINUATION:
+            proposal_ids_cr.add(proposal.id)
+
+    continuations_prev = None
+    if proposal_ids_cr:
+        continuations_prev = db.search_prev_proposal(
+            proposal_id=proposal_ids_cr,
+            continuation=True, resolved=True,
+            with_publications=False)
+
     for proposal in proposal_collection.values():
         code = facility.make_proposal_code(db, proposal)
+
+        continuation_proposal = None
+        continuation_code = None
+        if proposal.type == ProposalType.STANDARD:
+            pass
+
+        elif proposal.type == ProposalType.CONTINUATION:
+            try:
+                continuation_prev = continuations_prev.subset_by_this_proposal(
+                    proposal.id).get_single()
+                continuation_proposal = db.get_proposal(
+                    facility_id=facility_info.id,
+                    proposal_id=continuation_prev.proposal_id)
+            except:
+                logger.error('Could not find continuation for proposal {}', code)
+                n_err += 1
+                continue
+
+            continuation_code = facility.make_proposal_code(db, continuation_proposal)
+
+        else:
+            logger.error('Unknown type for proposal {}', code)
+            n_err += 1
+            continue
 
         if with_json:
             # Add proposal details to the list.
             proposal_detail = proposal._asdict()
             proposal_details[code] = proposal_detail
 
-            # Replace state enum value with a names.
+            # Replace some enum values with names.
             proposal_detail['state'] = ProposalState.get_name(proposal.state)
+            proposal_detail['type'] = ProposalType.get_name(proposal.type)
+            proposal_detail['call_type'] = type_class.get_name(proposal.call_type)
 
         if ((args['--output'] is not None)
+                or (args['--output-continuation'] is not None)
                 or (args['--output-affiliations'] is not None) or with_json):
             # Fetch affiliation information from the database if we don't have
             # it already.
@@ -285,9 +330,10 @@ def main():
             proposal_assignment = facility.calculate_affiliation_assignment(
                 db, proposal.members, affiliations)
 
-            if (args['--include-exempt-affiliations']
-                    or not proposal.decision_exempt):
-                assignments[code] = proposal_assignment
+            if continuation_proposal is None:
+                if (args['--include-exempt-affiliations']
+                        or not proposal.decision_exempt):
+                    assignments[code] = proposal_assignment
 
             if with_json:
                 proposal_detail['affiliation_assignment'] = {
@@ -302,7 +348,9 @@ def main():
         member_pi = None
         member_cois = []
 
-        if (args['--output'] is not None) or with_json:
+        if ((args['--output'] is not None)
+                or ((args['--output-continuation'] is not None))
+                or with_json):
             for member in proposal.members.values():
                 # Record actual member objects for JSON output.
                 is_pi = member.pi and (member_pi is None)
@@ -355,6 +403,7 @@ def main():
                 allocation = jcmt_allocations.subset_by_proposal(proposal.id)
                 if not allocation:
                     if ((args['--output'] is not None)
+                            or (args['--output-continuation'] is not None)
                             or (proposal.state == ProposalState.ACCEPTED)):
                         if args['--dummy-allocation']:
                             logger.warning('Using dummy allocation for project {}', code)
@@ -404,20 +453,31 @@ def main():
                     expiry_year += 1
                 expiry = datetime(expiry_year, expiry_month, 2)
 
-            proposals.append(Project(
-                code=code,
-                country=country,
-                pi=pi,
-                pi_affiliation=pi_affiliation,
-                cois=cois,
-                coi_affiliation=coi_affiliation,
-                title=proposal.title,
-                bands=bands,
-                allocation=allocation_total.total,
-                tagpriority=priority,
-                tagadjustment=None,
-                support='',
-                expiry=expiry))
+            if continuation_proposal is None:
+                proposals.append(null_tuple(Project)._replace(
+                    code=code,
+                    country=country,
+                    pi=pi,
+                    pi_affiliation=pi_affiliation,
+                    cois=cois,
+                    coi_affiliation=coi_affiliation,
+                    title=proposal.title,
+                    bands=bands,
+                    allocation=allocation_total.total,
+                    tagpriority=priority,
+                    tagadjustment=None,
+                    support='',
+                    expiry=expiry,
+                ))
+
+            else:
+                continuation_proposals.append(null_tuple(Project)._replace(
+                    code=continuation_code,
+                    continuation=code,
+                    bands=bands,
+                    allocation=allocation_total.total,
+                    tagpriority=priority,
+                ))
 
             if with_json:
                 del proposal_detail['member']
@@ -474,30 +534,38 @@ def main():
                     else:
                         proposal_detail['review_{}'.format(role_name)] = reviews
 
-        if (args['--output-targets'] is not None) or with_json:
-            # Fetch target information from the database.
-            proposal_targets = all_targets.subset_by_proposal(proposal.id)
-            targets[code] = proposal_targets
+        if continuation_proposal is None:
+            if (args['--output-targets'] is not None) or with_json:
+                # Fetch target information from the database.
+                proposal_targets = all_targets.subset_by_proposal(proposal.id)
+                targets[code] = proposal_targets
 
-            if with_json:
-                proposal_detail['targets'] = proposal_targets
+                if with_json:
+                    proposal_detail['targets'] = proposal_targets
 
         if (args['--output-notes'] is not None) and proposal.decision_note:
-            notes[code] = TextFormat(
-                text=proposal.decision_note,
-                format=proposal.decision_note_format)
+            notes[code] = {
+                'note': TextFormat(
+                    text=proposal.decision_note,
+                    format=proposal.decision_note_format),
+                'continuation': continuation_code,
+            }
 
         if (args['--output-feedback'] is not None):
             feedback_reviews = proposal.reviewers.values_by_role(
                 role_class.FEEDBACK)
-            if len(feedback_reviews) == 1:
-                feedback[code] = TextFormat(
-                    text=feedback_reviews[0].review_text,
-                    format=feedback_reviews[0].review_format)
-            elif len(feedback_reviews) > 1:
-                feedback[code] = TextFormat(
-                    text='Multiple feedback messages: please view online.',
-                    format=FormatType.PLAIN)
+            if feedback_reviews:
+                feedback[code] = {
+                    'note': (
+                        TextFormat(
+                            text=feedback_reviews[0].review_text,
+                            format=feedback_reviews[0].review_format)
+                        if len(feedback_reviews) == 1 else
+                        TextFormat(
+                            text='Multiple feedback messages: please view online.',
+                            format=FormatType.PLAIN)),
+                    'continuation': continuation_code,
+                }
 
         if (args['--output-publications'] is not None) or with_json:
             proposal_prev_proposals = \
@@ -515,6 +583,11 @@ def main():
         logger.debug('Writing project definition file')
         with file_or_stdout(args['--output'], 'wb') as file_:
             write_project_ini(file_, telescope, semester_code, proposals)
+
+    if args['--output-continuation'] is not None:
+        logger.debug('Writing continuation request file')
+        with file_or_stdout(args['--output-continuation'], 'wb') as file_:
+            write_project_ini(file_, telescope, semester_code, continuation_proposals)
 
     if args['--output-affiliations'] is not None:
         logger.debug('Writing affiliations file')

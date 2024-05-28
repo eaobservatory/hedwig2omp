@@ -1,4 +1,4 @@
-# Copyright (C) 2016 East Asian Observatory
+# Copyright (C) 2016-2024 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -33,21 +33,25 @@ def write_notes_file(file_, notes):
     """
 
     is_first = True
-    for (proposal_code, note) in notes.items():
+    for (proposal_code, note_info) in notes.items():
         if is_first:
             is_first = False
         else:
             print('', file=file_)
 
-        print(proposal_code, file=file_)
+        if note_info['continuation'] is None:
+            print(proposal_code, file=file_)
 
-        if note.format != FormatType.PLAIN:
+        else:
+            print('{} (continued by {})'.format(note_info['continuation'], proposal_code), file=file_)
+
+        if note_info['note'].format != FormatType.PLAIN:
             print('    Not plain text: please view online.', file=file_)
 
         else:
             first_paragraph = True
             for paragraph in paragraph_break.split(
-                    note.text.replace('\r', '')):
+                    note_info['note'].text.replace('\r', '')):
                 if first_paragraph:
                     first_paragraph = False
                 else:

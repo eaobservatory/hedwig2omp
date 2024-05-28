@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2021 East Asian Observatory
+# Copyright (C) 2015-2024 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -22,6 +22,6 @@ from collections import namedtuple
 
 
 Project = namedtuple('Project', (
-    'code', 'country', 'pi', 'cois', 'pi_affiliation', 'coi_affiliation',
+    'code', 'continuation', 'country', 'pi', 'cois', 'pi_affiliation', 'coi_affiliation',
     'title', 'bands', 'allocation', 'tagpriority', 'tagadjustment', 'support',
     'expiry'))
