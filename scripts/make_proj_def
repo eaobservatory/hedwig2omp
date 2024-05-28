@@ -375,7 +375,7 @@ def main():
 
                 affiliation_code = affiliation_codes.get(member.affiliation_id)
                 if affiliation_code is None:
-                    logger.error('Unknown affiliation: {}', member.affiliation_id)
+                    logger.error('Unknown affiliation: {} {}', member.affiliation_id, member.affiliation_name)
                     n_err += 1
                     continue
 
@@ -395,7 +395,7 @@ def main():
                     pi = ''
                     pi_affiliation = ''
                 else:
-                    logger.error('PI is unknown Hedwig user')
+                    logger.error('PI is unknown Hedwig user (user: {})', member_pi.person_id)
                     n_err += 1
                     continue
 
