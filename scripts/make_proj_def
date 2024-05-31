@@ -475,6 +475,10 @@ def main():
                 continuation_proposals.append(null_tuple(Project)._replace(
                     code=continuation_code,
                     continuation=code,
+                    pi=pi,
+                    pi_affiliation=pi_affiliation,
+                    cois=cois,
+                    coi_affiliation=coi_affiliation,
                     bands=bands,
                     allocation=allocation_total.total,
                     tagpriority=priority,
