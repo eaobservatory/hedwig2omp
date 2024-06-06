@@ -37,7 +37,7 @@ Usage:
         [--state <state>]
         [--decision-accept]
         [--dummy-allocation]
-    make_proj_def [-v | -q] --facility <facility> --project <project>
+    make_proj_def [-v | -q] --facility <facility> --project <project>...
         [--output <filename>]
         [--output-continuation <filename>]
         [--output-affiliations <filename>]
@@ -57,7 +57,7 @@ Options:
     --semester <semester>             Semester code
     --queue <queue>                   Queue code
     --type <type>                     Call type code
-    --project <project>               Specific project identifier
+    --project <project>...            Specific project identifier(s)
     --output, -o <filename>           Output filename
     --output-continuation <filename>  File to which to write continuation requests
     --output-affiliations <filename>  File to which to write affiliations
@@ -152,7 +152,7 @@ def main():
 
     type_class = facility.get_call_types()
 
-    if args['--project'] is None:
+    if args['--project'] == []:
         if args['--state'].lower() == 'any':
             # Assume "any" means any submitted state.
             state = ProposalState.submitted_states()
@@ -183,15 +183,28 @@ def main():
     else:
         logger.debug('Searching for specific proposal by identifier')
 
-        project_code = str_to_unicode(args['--project'])
+        proposal_ids = []
+        for project_code in args['--project']:
+            proposal_ids.append(facility.parse_proposal_code(
+                db, str_to_unicode(project_code)))
+
         proposal_collection = db.search_proposal(
-            proposal_id=facility.parse_proposal_code(db, project_code),
+            proposal_id=proposal_ids,
             **query_kwargs)
 
-        proposal = proposal_collection.get_single()
-        semester_code = proposal.semester_code
-        queue_code = proposal.queue_code
-        call_type = proposal.call_type
+        semester_code = None
+        for proposal in proposal_collection.values():
+            if semester_code is None:
+                semester_code = proposal.semester_code
+                queue_code = proposal.queue_code
+                call_type = proposal.call_type
+            else:
+                if not (
+                        (semester_code == proposal.semester_code)
+                        and (queue_code == proposal.queue_code)
+                        and (call_type == proposal.call_type)):
+                    logger.error('Specified projects have inconsistent semster, queue or call type')
+                    sys.exit(1)
 
     # Override the semester name if we are processing test proposals.
     if call_type == type_class.TEST:

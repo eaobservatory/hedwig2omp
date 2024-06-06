@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (C) 2015-2023 East Asian Observatory
+# Copyright (C) 2015-2024 East Asian Observatory
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it under
@@ -26,7 +26,7 @@ Usage:
         [--skip-unregistered]
         [--decision-accept]
         [--search-inferred]
-    match_users [-v | -q] --facility <facility> --project <project>
+    match_users [-v | -q] --facility <facility> --project <project>...
         [--skip-unregistered]
         [--search-inferred]
 
@@ -36,7 +36,7 @@ Options:
     --semester <semester>    Semester code
     --queue <queue>          Queue code
     --type <type>            Call type code
-    --project <project>      Specific project identifier
+    --project <project>...   Specific project identifier(s)
     --state <state>          Select proposals of given state [default: accepted]
     --skip-unregistered, -r  Skip unregistered proposal members
     --decision-accept        Select only proposals marked as being accepted
@@ -105,7 +105,7 @@ def main():
         'with_members': True,
     }
 
-    if args['--project'] is None:
+    if args['--project'] == []:
         semester_code = str_to_unicode(args['--semester'])
         queue_code = str_to_unicode(args['--queue'])
 
@@ -135,9 +135,13 @@ def main():
     else:
         logger.debug('Searching for specific proposal by identifier')
 
-        project_code = str_to_unicode(args['--project'])
+        proposal_ids = []
+        for project_code in args['--project']:
+            proposal_ids.append(facility.parse_proposal_code(
+                db, str_to_unicode(project_code)))
+
         proposal_collection = db.search_proposal(
-            proposal_id=facility.parse_proposal_code(db, project_code),
+            proposal_id=proposal_ids,
             **query_kwargs)
 
     considered = set()
