@@ -28,6 +28,7 @@ Usage:
         [--search-inferred]
     match_users [-v | -q] --facility <facility> --project <project>
         [--skip-unregistered]
+        [--search-inferred]
 
 Options:
 
