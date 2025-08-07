@@ -36,7 +36,7 @@ Usage:
         [--all-reviews]
         [--state <state>]
         [--decision-accept]
-        [--dummy-allocation]
+        [--dummy-allocation | --request-allocation]
     make_proj_def [-v | -q] --facility <facility> --project <project>...
         [--output <filename>]
         [--output-continuation <filename>]
@@ -49,7 +49,7 @@ Usage:
         [--include-exempt-affiliations]
         [--skip-unknown-cois]
         [--skip-unknown-pis]
-        [--dummy-allocation]
+        [--dummy-allocation | --request-allocation]
 
 Options:
 
@@ -73,6 +73,7 @@ Options:
     --decision-accept                 Select only proposals marked as being accepted
     --all-reviews                     Export all reviews in JSON output
     --dummy-allocation                If the allocation is missing, use a dummy value
+    --request-allocation              If the allocation is missing, use request values
     --verbose, -v                     Increase verbosity
     --quiet, -q                       Decreate verbosity
 """
@@ -243,7 +244,7 @@ def main():
             jcmt_allocations = db.search_jcmt_allocation(proposal_id=proposal_ids)
             jcmt_request_options = db.search_jcmt_options(proposal_id=proposal_ids)
             jcmt_alloc_options = db.search_jcmt_alloc_options(proposal_id=proposal_ids)
-    if with_json:
+    if with_json or args['--request-allocation']:
         if telescope == 'JCMT':
             jcmt_requests = db.search_jcmt_request(proposal_id=proposal_ids)
     if (args['--output-targets'] is not None) or with_json:
@@ -420,7 +421,14 @@ def main():
                     if ((args['--output'] is not None)
                             or (args['--output-continuation'] is not None)
                             or (proposal.state == ProposalState.ACCEPTED)):
-                        if args['--dummy-allocation']:
+                        if args['--request-allocation']:
+                            allocation = jcmt_requests.subset_by_proposal(proposal.id)
+                            if allocation:
+                                logger.warning('Using request as allocation for project {}', code)
+                            else:
+                                logger.error('No allocation or request for project {}', code)
+                                n_err += 1
+                        elif args['--dummy-allocation']:
                             logger.warning('Using dummy allocation for project {}', code)
                             allocation = JCMTRequestCollection(((
                                 1, null_tuple(JCMTRequest)._replace(
