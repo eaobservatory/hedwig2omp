@@ -531,7 +531,8 @@ def main():
                         jcmt_alloc_options.subset_by_proposal(
                             proposal.id).get_single(default=None)
 
-                roles = (role_class.get_options()
+                roles = (
+                    role_class.get_options()
                     if args['--all-reviews']
                     else {role_class.TECH: 'Technical'})
 

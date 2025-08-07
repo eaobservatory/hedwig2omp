@@ -109,7 +109,6 @@ def main():
         semester_code = str_to_unicode(args['--semester'])
         queue_code = str_to_unicode(args['--queue'])
 
-
         state = ProposalState.by_name(args['--state'])
         if state is None:
             logger.error('State "{}" not recognised', args['--state'])
