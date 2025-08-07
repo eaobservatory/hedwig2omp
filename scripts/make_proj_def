@@ -610,14 +610,20 @@ def main():
         sys.exit(1)
 
     if args['--output'] is not None:
-        logger.debug('Writing project definition file')
-        with file_or_stdout(args['--output'], 'wb') as file_:
-            write_project_ini(file_, telescope, semester_code, proposals)
+        if not proposals:
+            logger.debug('No project definitions to write')
+        else:
+            logger.debug('Writing project definition file')
+            with file_or_stdout(args['--output'], 'wb') as file_:
+                write_project_ini(file_, telescope, semester_code, proposals)
 
     if args['--output-continuation'] is not None:
-        logger.debug('Writing continuation request file')
-        with file_or_stdout(args['--output-continuation'], 'wb') as file_:
-            write_project_ini(file_, telescope, semester_code, continuation_proposals)
+        if not continuation_proposals:
+            logger.debug('No continuation requests to write')
+        else:
+            logger.debug('Writing continuation request file')
+            with file_or_stdout(args['--output-continuation'], 'wb') as file_:
+                write_project_ini(file_, telescope, semester_code, continuation_proposals)
 
     if args['--output-affiliations'] is not None:
         logger.debug('Writing affiliations file')
