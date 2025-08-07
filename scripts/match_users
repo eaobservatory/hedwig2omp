@@ -146,6 +146,9 @@ def main():
 
     considered = set()
     for proposal in proposal_collection.values():
+        logger.info(
+            'Checking members of proposal {}',
+            facility.make_proposal_code(db, proposal))
         for member in proposal.members.values():
             if args['--skip-unregistered'] and not member.person_registered:
                 continue
