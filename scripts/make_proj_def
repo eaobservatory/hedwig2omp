@@ -214,6 +214,7 @@ def main():
     if config.has_option('queue_country', queue_code):
         country = config.get('queue_country', queue_code)
     else:
+        logger.warning('Could not find country, using "{}"', queue_code)
         country = queue_code
 
     proposals = []
